@@ -19,7 +19,7 @@
 {"grupo": "catalogo", "texto": "busco una hoja de cálculo que se llama inventario y no sé en qué carpeta la puse", "so": "linux", "esperado": "playbook:files.find", "categoria": "Archivos y carpetas"}
 {"grupo": "fuera", "texto": "la impresora se quedó sin tóner", "so": "linux", "esperado": "escalar", "categoria": "Impresión"}
 {"grupo": "fuera", "texto": "se atascó una hoja de papel dentro de la impresora", "so": "linux", "esperado": ["escalar", "guia"], "categoria": "Impresión"}
-{"grupo": "fuera", "texto": "mi mouse no funciona", "so": "linux", "esperado": ["guia", "pregunta"], "categoria": "Hardware"}
+{"grupo": "fuera", "texto": "mi mouse no funciona", "so": "linux", "esperado": ["guia", "pregunta", "playbook:usb.devices"], "categoria": "Hardware"}
 {"grupo": "fuera", "texto": "la pantalla de mi laptop está rota", "so": "linux", "esperado": "escalar", "categoria": "Hardware"}
 {"grupo": "fuera", "texto": "necesito que me instalen AutoCAD", "so": "linux", "esperado": "escalar", "categoria": "Software"}
 {"grupo": "fuera", "texto": "olvidé mi contraseña del correo", "so": "linux", "esperado": "escalar", "categoria": "Cuentas y accesos"}

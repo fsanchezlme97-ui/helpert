@@ -3,9 +3,11 @@
 # (típico tras usar sudo). Cambiar el dueño necesita root, así que aquí no se puede actuar como la persona; por eso:
 # - solo cuentas de personas (UID 501 o más) con la carpeta en /Users;
 # - sin cruzar a otros discos (-xdev) ni tocar la raíz de uno montado dentro;
-# - macOS deja enlazar (enlace duro) archivos ajenos, y la persona podría cambiar uno por un enlace a uno del sistema
-#   justo antes del cambio. Por eso cada entrada se abre sin seguir enlaces, se revisa lo abierto (mismo disco, de otra
-#   cuenta, carpeta o archivo con un solo enlace) y se cambia el dueño de eso mismo (fchown), no del nombre;
+# - macOS deja enlazar (enlace duro) archivos ajenos, y entre revisar y cambiar el dueño la persona podría cambiar un
+#   archivo por un enlace a uno del sistema: ninguna revisión de enlaces lo evita. Por eso root solo cambia el dueño
+#   (fchown sobre lo abierto sin seguir enlaces, tras revisar disco y dueño) de carpetas, y de archivos dentro de una
+#   carpeta que la persona no puede modificar (se hacen antes que la carpeta, con -depth). Los demás los copia y
+#   reemplaza la propia persona, con su cuenta: no gana nada que no pudiera hacer ella; si no puede leerlos, va a soporte;
 # - los enlaces simbólicos no se tocan: su dueño no impide guardar ni borrar.
 # Solo cambia el dueño. macOS puede negar el acceso a carpetas protegidas (TCC): si pasa, se dice.
 set -u
@@ -33,12 +35,13 @@ tope() {  # corre «$2...» con un tope de $1 segundos (macOS no trae timeout); 
   return "$c"
 }
 ajenos() { find "$casa" -xdev ! -user "$uid" \( -type d -o \( -type f -links 1 \) \) "$@"; }
-# argumentos: uid, disco de la carpeta personal y los nombres (relativos a la carpeta de cada uno, por -execdir)
+# argumentos: uid, disco de la carpeta personal y los nombres, desde su carpeta (-execdir)
 devolver='use Fcntl; my ($u, $d) = splice(@ARGV, 0, 2);
+my @c = stat("."); my $quieta = @c && $c[4] != $u && !($c[2] & 022);  # la persona no puede cambiar los nombres de aquí
 for (@ARGV) {
   sysopen(my $f, $_, O_RDONLY | O_NOFOLLOW | O_NONBLOCK) or next;
   my @s = stat($f) or next;
-  next if $s[0] != $d || $s[4] == $u || !(-d _ || (-f _ && $s[3] == 1));
+  next if $s[0] != $d || $s[4] == $u || !(-d _ || (-f _ && $s[3] == 1 && $quieta));
   chown($u, -1, $f);
 }'
 cuantos() { ajenos -print 2>/dev/null | wc -l | tr -d ' '; }
@@ -72,7 +75,8 @@ aplicar)
   puedo || exit 1
   n=$(cuantos)
   [ -x /usr/bin/perl ] || { echo "Falta una herramienta de macOS (perl) para hacerlo con seguridad. Pide a soporte que lo revise."; exit 1; }
-  ajenos -execdir /usr/bin/perl -e "$devolver" "$uid" "$(stat -f %d "$casa")" {} + 2>/dev/null
+  ajenos -depth -execdir /usr/bin/perl -e "$devolver" "$uid" "$(stat -f %d "$casa")" {} + 2>/dev/null
+  ajenos -type f -execdir /usr/bin/sudo -u "$usuario" /bin/sh -c 'cp -p "$1" "$1.helpert-tmp" && mv -f "$1.helpert-tmp" "$1" || rm -f "$1.helpert-tmp"' helpert {} \; 2>/dev/null
   q=$(cuantos)
   [ "${q:-0}" -eq 0 ] || { echo "Devolví $((n - q)) archivo(s), pero no pude con $q: pide a soporte que lo revise."; exit 1; }
   echo "Te devolví $n archivo(s) o carpeta(s) de tu carpeta personal. Prueba de nuevo a guardar o cambiar el archivo."
