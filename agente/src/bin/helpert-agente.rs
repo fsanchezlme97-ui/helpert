@@ -561,6 +561,7 @@ mod servicio {
             eprintln!("[agente] {p}");
             super::salir(1);
         }));
+        std::thread::spawn(agente::preparar_powershell);  // la caché de módulos, antes del primer playbook
         super::arrancar();
     }
 

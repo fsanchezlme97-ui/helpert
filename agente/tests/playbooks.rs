@@ -52,6 +52,8 @@ fn firma_de_python_valida_y_ejecucion_completa() {
         let (raiz, datos) = (std::env::var("SystemRoot").unwrap(), std::env::var("ProgramData").unwrap());
         (PathBuf::from(format!(r"{datos}\Helpert\tmp\helpert-prueba-{nombre}")), format!(r"{raiz}\System32;"))
     };
+    #[cfg(windows)]
+    agente::preparar_powershell(); // como el servicio al arrancar: el primer PowerShell deja la caché de módulos
     let d = ejecutar(&p, SO, "diagnosticar", &env, "ana");
     assert_eq!(d.codigo, 0, "{d:?}");
     assert!(d.salida.contains("Se creará"), "salida en UTF-8: {d:?}");

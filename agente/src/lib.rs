@@ -310,8 +310,13 @@ fn comando(script: &str, _id: &str, _paso: &str) -> Command {
     use std::os::windows::process::CommandExt;
     let raiz = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
     let fuente = format!("$ProgressPreference = 'SilentlyContinue'\n[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false\n$OutputEncoding = [Console]::OutputEncoding\n{script}");
-    let tmp = format!(r"{}\Helpert\tmp", std::env::var("ProgramData").unwrap_or_else(|_| r"C:\ProgramData".into()));
+    let datos = format!(r"{}\Helpert", std::env::var("ProgramData").unwrap_or_else(|_| r"C:\ProgramData".into()));
+    let tmp = format!(r"{datos}\tmp");
     let _ = std::fs::create_dir_all(&tmp);
+    // Sin caché propia, PowerShell 5.1 vuelve a analizar todos los módulos instalados en cada arranque (11-23 s en la
+    // CI): la caché vive en la carpeta del agente, que hereda los permisos de solo SYSTEM y administradores.
+    let cache = format!(r"{datos}\powershell");
+    let _ = std::fs::create_dir_all(&cache);
     let utf16: Vec<u8> = fuente.encode_utf16().flat_map(u16::to_le_bytes).collect();
     let mut cmd = Command::new(format!(r"{raiz}\System32\WindowsPowerShell\v1.0\powershell.exe"));
     cmd.args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", &base64(&utf16)])
@@ -321,11 +326,29 @@ fn comando(script: &str, _id: &str, _paso: &str) -> Command {
                "PROCESSOR_ARCHITECTURE", "OS", "ALLUSERSPROFILE", "PUBLIC"]
             .into_iter().filter_map(|k| std::env::var(k).ok().map(|v| (k, v))))
         .env("PATH", format!(r"{raiz}\System32;{raiz};{raiz}\System32\Wbem;{raiz}\System32\WindowsPowerShell\v1.0\"))
+        .env("PSModuleAnalysisCachePath", format!(r"{cache}\ModuleAnalysisCache"))
         .env("TEMP", &tmp)
         .env("TMP", &tmp)
         .current_dir(&raiz)
         .creation_flags(0x0800_0000); // CREATE_NO_WINDOW
     cmd
+}
+
+/// Arranca PowerShell una vez, como un paso de playbook, para que deje su caché de módulos: así el primer playbook
+/// de un equipo nuevo no se pasa del tiempo límite. Espera a que termine (como mucho 2 minutos).
+#[cfg(windows)]
+pub fn preparar_powershell() {
+    let mut cmd = comando("exit 0", "preparar", "preparar");
+    cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+    if let Ok(mut hijo) = cmd.spawn() {
+        let grupo = Grupo::de(&hijo);
+        let limite = Instant::now() + Duration::from_secs(120);
+        while matches!(hijo.try_wait(), Ok(None)) && Instant::now() < limite {
+            std::thread::sleep(Duration::from_millis(200));
+        }
+        grupo.matar();
+        let _ = hijo.wait();
+    }
 }
 
 /// Base64 estándar (para -EncodedCommand).
