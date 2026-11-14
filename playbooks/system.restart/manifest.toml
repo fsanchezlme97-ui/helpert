@@ -1,0 +1,12 @@
+id = "system.restart"
+version = "0.1.0"
+nombre = "Reiniciar el equipo"
+descripcion = "El equipo lleva días sin reiniciarse, una actualización lo pide o algo dejó de funcionar. Programa un reinicio en 2 minutos con aviso, para que la persona guarde su trabajo."
+riesgo = "medio"
+deshacer = false
+timeout = 30
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

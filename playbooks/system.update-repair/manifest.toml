@@ -1,0 +1,11 @@
+id = "system.update-repair"
+version = "0.1.0"
+nombre = "Reparar las actualizaciones del sistema"
+descripcion = "Las actualizaciones fallan siempre con un error. Repara el gestor de actualizaciones (componentes de Windows Update o paquetes a medio instalar en Linux) sin instalar nada nuevo."
+riesgo = "medio"
+deshacer = false
+timeout = 1200
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"

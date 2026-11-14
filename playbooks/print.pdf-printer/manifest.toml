@@ -1,0 +1,10 @@
+id = "print.pdf-printer"
+version = "0.1.0"
+nombre = "Recuperar la impresora PDF"
+descripcion = "No aparece la opción de imprimir a PDF (Microsoft Print to PDF). Vuelve a activar esa impresora del sistema."
+riesgo = "bajo"
+deshacer = false
+timeout = 300
+
+[sistemas]
+windows = "windows.ps1"

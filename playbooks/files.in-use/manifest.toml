@@ -1,0 +1,18 @@
+id = "files.in-use"
+version = "0.1.0"
+nombre = "Ver qué programa usa un archivo"
+descripcion = "No se puede borrar, mover o abrir un archivo porque «está en uso». Busca qué programa de la persona lo tiene abierto y lo cierra. El parámetro archivo es una palabra de su nombre."
+riesgo = "medio"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"
+
+[parametros.archivo]
+tipo = "texto"
+requerido = true
+max = 100
+pregunta = "¿Cómo se llama el archivo? Dime una palabra de su nombre, por ejemplo informe."

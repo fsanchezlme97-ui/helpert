@@ -1,0 +1,18 @@
+id = "net.site-check"
+version = "0.1.0"
+nombre = "Probar si un sitio o sistema responde"
+descripcion = "Un sistema, página o servidor concreto no carga. Prueba el nombre (DNS), la conexión y el certificado de ese sitio y dice dónde falla. Solo revisa. El parámetro sitio es la dirección."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"
+
+[parametros.sitio]
+tipo = "texto"
+requerido = true
+max = 100
+pregunta = "¿Qué página o sistema no abre? Dime su dirección, por ejemplo intranet.empresa.pe."

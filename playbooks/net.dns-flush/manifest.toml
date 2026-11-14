@@ -1,0 +1,12 @@
+id = "net.dns-flush"
+version = "0.1.0"
+nombre = "Limpiar la caché de nombres (DNS)"
+descripcion = "Una página o sistema no abre en este equipo pero sí en otros, o cambió de servidor hace poco. Borra la caché de nombres (DNS). No reinicia la red (eso es «Sin internet o Wi-Fi»)."
+riesgo = "bajo"
+deshacer = false
+timeout = 30
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

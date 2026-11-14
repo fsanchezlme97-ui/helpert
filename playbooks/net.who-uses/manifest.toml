@@ -1,0 +1,12 @@
+id = "net.who-uses"
+version = "0.1.0"
+nombre = "Ver qué programa usa internet"
+descripcion = "Internet va lento y la persona quiere saber qué programa está usando la red. Lista los programas con más conexiones abiertas. Solo revisa: no cierra nada."
+riesgo = "bajo"
+deshacer = false
+timeout = 30
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

@@ -1,0 +1,12 @@
+id = "security.admin-users"
+version = "0.1.0"
+nombre = "Ver las cuentas de administrador"
+descripcion = "Saber qué cuentas tienen permisos de administrador en el equipo. Las lista. Solo revisa: dar o quitar permisos lo hace soporte."
+riesgo = "bajo"
+deshacer = false
+timeout = 30
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

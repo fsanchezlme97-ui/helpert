@@ -1,0 +1,10 @@
+id = "system.activation"
+version = "0.1.0"
+nombre = "Revisar la activación de Windows"
+descripcion = "Windows dice que no está activado o muestra una marca de agua. Revisa el estado de la licencia. Solo revisa: activarlo lo hace soporte."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+windows = "windows.ps1"

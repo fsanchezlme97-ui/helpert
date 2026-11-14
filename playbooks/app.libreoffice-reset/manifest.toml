@@ -1,0 +1,12 @@
+id = "app.libreoffice-reset"
+version = "0.1.0"
+nombre = "Restablecer LibreOffice"
+descripcion = "LibreOffice no abre, se cierra solo o se ve mal. Renombra el perfil de LibreOffice de la persona para empezar con uno nuevo. Se puede deshacer."
+riesgo = "bajo"
+deshacer = true
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

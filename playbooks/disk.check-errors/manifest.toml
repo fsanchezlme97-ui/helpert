@@ -1,0 +1,12 @@
+id = "disk.check-errors"
+version = "0.1.0"
+nombre = "Revisar errores del disco"
+descripcion = "El sistema avisa de errores en el disco, archivos dañados o disco en solo lectura. Revisa el sistema de archivos sin cambiar nada y dice si hace falta repararlo al reiniciar."
+riesgo = "bajo"
+deshacer = false
+timeout = 900
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

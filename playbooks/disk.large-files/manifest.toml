@@ -1,0 +1,12 @@
+id = "disk.large-files"
+version = "0.1.0"
+nombre = "Encontrar los archivos más grandes"
+descripcion = "El disco está lleno y la persona quiere saber qué ocupa espacio. Lista los archivos y carpetas más grandes de su carpeta personal. Solo revisa (limpiar es «Liberar espacio en disco»)."
+riesgo = "bajo"
+deshacer = false
+timeout = 300
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

@@ -1,0 +1,11 @@
+id = "print.scanner"
+version = "0.1.0"
+nombre = "Revisar el escáner"
+descripcion = "El escáner no aparece o no escanea. Revisa si el equipo lo detecta y reinicia el servicio de escaneo. No instala controladores."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"

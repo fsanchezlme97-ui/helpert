@@ -1,0 +1,18 @@
+id = "app.crash-report"
+version = "0.1.0"
+nombre = "Ver por qué un programa se cierra solo"
+descripcion = "Un programa se cierra solo o no abre. Busca en los registros del sistema sus últimos cierres inesperados. Solo revisa. El parámetro programa es su nombre en una palabra."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"
+
+[parametros.programa]
+tipo = "texto"
+requerido = true
+max = 100
+pregunta = "¿Qué programa es? Dime su nombre en una palabra, por ejemplo excel."

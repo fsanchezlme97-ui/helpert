@@ -1,0 +1,12 @@
+id = "system.fonts-cache"
+version = "0.1.0"
+nombre = "Reparar las fuentes"
+descripcion = "Las letras se ven raras o una fuente instalada no aparece en los programas. Reconstruye la caché de fuentes del sistema."
+riesgo = "bajo"
+deshacer = false
+timeout = 120
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

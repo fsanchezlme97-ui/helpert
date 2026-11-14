@@ -1,0 +1,12 @@
+id = "system.sleep-check"
+version = "0.1.0"
+nombre = "Revisar la suspensión"
+descripcion = "El equipo no entra en suspensión, se despierta solo o gasta batería con la tapa cerrada. Muestra qué programa o dispositivo lo mantiene despierto. Solo revisa."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

@@ -1,0 +1,10 @@
+id = "app.update-apps"
+version = "0.1.0"
+nombre = "Actualizar las aplicaciones"
+descripcion = "Soporte pidió actualizar los programas o uno avisa que está desactualizado. Actualiza las aplicaciones de la tienda del sistema (Flatpak y Snap). No instala programas nuevos."
+riesgo = "bajo"
+deshacer = false
+timeout = 1800
+
+[sistemas]
+linux = "linux.sh"

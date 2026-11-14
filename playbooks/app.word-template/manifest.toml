@@ -1,0 +1,11 @@
+id = "app.word-template"
+version = "0.1.0"
+nombre = "Reparar la plantilla de Word"
+descripcion = "Word abre con formato raro, se cierra al abrir o da errores con la plantilla Normal. Renombra la plantilla Normal de la persona para que Word cree una nueva. Se puede deshacer."
+riesgo = "bajo"
+deshacer = true
+timeout = 60
+
+[sistemas]
+windows = "windows.ps1"
+macos = "macos.sh"

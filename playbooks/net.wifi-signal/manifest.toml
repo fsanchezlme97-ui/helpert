@@ -1,0 +1,12 @@
+id = "net.wifi-signal"
+version = "0.1.0"
+nombre = "Revisar la señal del Wi-Fi"
+descripcion = "El Wi-Fi está lento o se corta a ratos. Mide la señal, la banda y el canal y dice si conviene acercarse al router. Solo revisa. Si no conecta, es «Reconectar el Wi-Fi»."
+riesgo = "bajo"
+deshacer = false
+timeout = 30
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

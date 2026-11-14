@@ -1,0 +1,11 @@
+id = "hw.device-errors"
+version = "0.1.0"
+nombre = "Revisar dispositivos con errores"
+descripcion = "Un dispositivo (teclado, mouse, pantalla, lector) dejó de funcionar o aparece con un aviso. Lista los dispositivos con error y vuelve a detectarlos."
+riesgo = "bajo"
+deshacer = false
+timeout = 120
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"

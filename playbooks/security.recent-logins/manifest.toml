@@ -1,0 +1,12 @@
+id = "security.recent-logins"
+version = "0.1.0"
+nombre = "Ver los inicios de sesión recientes"
+descripcion = "La persona cree que alguien usó su equipo. Lista los inicios de sesión y los intentos fallidos de los últimos 7 días. Solo revisa."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

@@ -1,0 +1,12 @@
+id = "system.updates"
+version = "0.1.0"
+nombre = "Revisar las actualizaciones pendientes"
+descripcion = "Saber si el sistema tiene actualizaciones o un reinicio pendientes. Los lista. Solo revisa: instalarlas lo programa soporte."
+riesgo = "bajo"
+deshacer = false
+timeout = 300
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

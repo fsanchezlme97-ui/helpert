@@ -1,0 +1,12 @@
+id = "security.firewall"
+version = "0.1.0"
+nombre = "Activar el cortafuegos"
+descripcion = "El sistema avisa que el cortafuegos está apagado. Lo activa con la configuración por defecto, sin borrar reglas. No abre puertos ni da accesos: eso lo hace soporte."
+riesgo = "medio"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

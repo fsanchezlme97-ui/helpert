@@ -1,0 +1,18 @@
+id = "net.hosts-site"
+version = "0.1.0"
+nombre = "Desbloquear un sitio en el archivo hosts"
+descripcion = "Un sitio concreto no abre porque el archivo hosts del equipo lo redirige o bloquea. Quita las líneas de ese sitio, con copia para deshacer. El parámetro sitio es el dominio."
+riesgo = "medio"
+deshacer = true
+timeout = 30
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"
+
+[parametros.sitio]
+tipo = "texto"
+requerido = true
+max = 100
+pregunta = "¿Qué página o sistema no abre? Dime su dirección, por ejemplo intranet.empresa.pe."

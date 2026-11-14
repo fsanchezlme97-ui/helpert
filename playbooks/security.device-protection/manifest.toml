@@ -1,0 +1,12 @@
+id = "security.device-protection"
+version = "0.1.0"
+nombre = "Revisar el cifrado y la protección del equipo"
+descripcion = "Revisar si el disco está cifrado (BitLocker, LUKS o FileVault) y si el arranque seguro y el chip TPM están activos. Solo revisa: activar el cifrado lo hace soporte."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

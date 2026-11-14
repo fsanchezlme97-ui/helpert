@@ -1,0 +1,12 @@
+id = "usb.eject"
+version = "0.1.0"
+nombre = "Expulsar una memoria USB con seguridad"
+descripcion = "No deja expulsar la memoria USB o el disco externo porque está en uso. Dice qué programa la usa, termina de guardar lo pendiente y la expulsa."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

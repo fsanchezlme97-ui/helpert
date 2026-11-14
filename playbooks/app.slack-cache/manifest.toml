@@ -1,0 +1,12 @@
+id = "app.slack-cache"
+version = "0.1.0"
+nombre = "Limpiar la caché de Slack"
+descripcion = "Slack no carga, se ve mal o no muestra mensajes nuevos. Cierra Slack de la persona y borra su caché (los mensajes están en la nube)."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

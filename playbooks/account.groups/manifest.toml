@@ -1,0 +1,12 @@
+id = "account.groups"
+version = "0.1.0"
+nombre = "Ver los grupos de la cuenta"
+descripcion = "Soporte necesita saber a qué grupos pertenece la cuenta de la persona en el equipo o en el dominio. Los lista. Solo revisa: dar accesos lo hace soporte."
+riesgo = "bajo"
+deshacer = false
+timeout = 30
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

@@ -1,0 +1,12 @@
+id = "security.av-update"
+version = "0.1.0"
+nombre = "Actualizar el antivirus"
+descripcion = "El antivirus dice que está desactualizado. Descarga sus firmas nuevas (Microsoft Defender, ClamAV si está instalado o XProtect). No instala un antivirus nuevo."
+riesgo = "bajo"
+deshacer = false
+timeout = 600
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

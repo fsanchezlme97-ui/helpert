@@ -1,0 +1,12 @@
+id = "system.power-plan"
+version = "0.1.0"
+nombre = "Poner el plan de energía equilibrado"
+descripcion = "El equipo va lento con batería o se queda en modo de ahorro. Deja el plan de energía en equilibrado."
+riesgo = "bajo"
+deshacer = false
+timeout = 30
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

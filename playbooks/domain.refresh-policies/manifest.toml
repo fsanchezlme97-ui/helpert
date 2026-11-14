@@ -1,0 +1,11 @@
+id = "domain.refresh-policies"
+version = "0.1.0"
+nombre = "Actualizar las políticas de la empresa"
+descripcion = "No se aplican las configuraciones de la empresa o faltan unidades o impresoras asignadas por política. Vuelve a aplicar las políticas del dominio en el equipo."
+riesgo = "bajo"
+deshacer = false
+timeout = 300
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"

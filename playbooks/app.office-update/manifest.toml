@@ -1,0 +1,11 @@
+id = "app.office-update"
+version = "0.1.0"
+nombre = "Actualizar Microsoft Office"
+descripcion = "Office está desactualizado o soporte pidió actualizarlo. Inicia la actualización de Office; termina de aplicarse al cerrar los programas."
+riesgo = "bajo"
+deshacer = false
+timeout = 1800
+
+[sistemas]
+windows = "windows.ps1"
+macos = "macos.sh"

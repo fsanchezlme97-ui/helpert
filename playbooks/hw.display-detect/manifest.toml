@@ -1,0 +1,11 @@
+id = "hw.display-detect"
+version = "0.1.0"
+nombre = "Detectar un monitor externo"
+descripcion = "El segundo monitor o el proyector no se detecta. Revisa qué pantallas ve el equipo y vuelve a buscar dispositivos. No cambia la resolución ni el orden."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"

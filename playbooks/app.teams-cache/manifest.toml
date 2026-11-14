@@ -1,0 +1,12 @@
+id = "app.teams-cache"
+version = "0.1.0"
+nombre = "Limpiar la caché de Teams"
+descripcion = "Microsoft Teams no carga, se queda en blanco, no muestra mensajes o va lento. Cierra Teams de la persona y borra su caché (los chats y archivos están en la nube)."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

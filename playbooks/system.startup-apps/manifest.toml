@@ -1,0 +1,12 @@
+id = "system.startup-apps"
+version = "0.1.0"
+nombre = "Ver los programas que arrancan al inicio"
+descripcion = "El equipo tarda en arrancar o abre programas solos al iniciar sesión. Lista los programas y servicios que arrancan al inicio. Solo revisa."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

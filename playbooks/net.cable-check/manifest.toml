@@ -1,0 +1,12 @@
+id = "net.cable-check"
+version = "0.1.0"
+nombre = "Revisar el cable de red"
+descripcion = "El equipo con cable no tiene red. Revisa si el puerto detecta el cable, a qué velocidad y si recibió dirección. Solo revisa: un cable o punto de red dañado lo ve un técnico."
+riesgo = "bajo"
+deshacer = false
+timeout = 30
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

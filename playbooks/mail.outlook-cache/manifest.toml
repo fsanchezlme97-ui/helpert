@@ -1,0 +1,10 @@
+id = "mail.outlook-cache"
+version = "0.1.0"
+nombre = "Rehacer la caché de Outlook"
+descripcion = "Outlook no sincroniza, faltan correos o carpetas, o se cierra al abrir. Cierra Outlook y renombra su caché (OST) para que la descargue de nuevo. Con buzones grandes tarda."
+riesgo = "medio"
+deshacer = true
+timeout = 120
+
+[sistemas]
+windows = "windows.ps1"

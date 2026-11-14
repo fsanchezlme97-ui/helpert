@@ -1,0 +1,12 @@
+id = "files.icon-cache"
+version = "0.1.0"
+nombre = "Reparar iconos y miniaturas"
+descripcion = "Los iconos se ven en blanco o las miniaturas de fotos y documentos no aparecen o son viejas. Borra la caché de iconos y miniaturas de la persona; se rehace sola."
+riesgo = "bajo"
+deshacer = false
+timeout = 120
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

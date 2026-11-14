@@ -1,0 +1,10 @@
+id = "net.winsock-reset"
+version = "0.1.0"
+nombre = "Restablecer la red de Windows"
+descripcion = "Ninguna red funciona en Windows aunque el Wi-Fi o el cable conectan, y «Sin internet o Wi-Fi» no bastó. Restablece Winsock y TCP/IP; hay que reiniciar después. Borra la configuración de red manual."
+riesgo = "medio"
+deshacer = false
+timeout = 60
+
+[sistemas]
+windows = "windows.ps1"

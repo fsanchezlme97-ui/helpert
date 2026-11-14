@@ -1,0 +1,11 @@
+id = "system.services-check"
+version = "0.1.0"
+nombre = "Revisar los servicios del sistema"
+descripcion = "Algo del sistema dejó de funcionar (impresión, sonido, red, búsqueda, hora). Revisa los servicios esenciales y vuelve a iniciar los que deberían estar activos y están detenidos."
+riesgo = "medio"
+deshacer = false
+timeout = 120
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"

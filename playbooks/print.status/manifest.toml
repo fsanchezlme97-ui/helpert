@@ -1,0 +1,12 @@
+id = "print.status"
+version = "0.1.0"
+nombre = "Ver las impresoras y su estado"
+descripcion = "La persona no sabe qué impresoras tiene o cuál falla. Lista las impresoras instaladas, la predeterminada y si están en pausa, sin conexión o con trabajos. Solo revisa."
+riesgo = "bajo"
+deshacer = false
+timeout = 30
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

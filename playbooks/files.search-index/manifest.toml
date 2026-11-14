@@ -1,0 +1,12 @@
+id = "files.search-index"
+version = "0.1.0"
+nombre = "Reparar la búsqueda de archivos"
+descripcion = "La búsqueda del sistema no encuentra archivos que sí existen. Reconstruye el índice de búsqueda; tarda un rato en volver a llenarse."
+riesgo = "bajo"
+deshacer = false
+timeout = 300
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

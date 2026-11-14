@@ -1,0 +1,12 @@
+id = "browser.extensions"
+version = "0.1.0"
+nombre = "Ver las extensiones del navegador"
+descripcion = "El navegador abre páginas raras, cambió el buscador o muestra publicidad. Lista las extensiones de los navegadores de la persona. Solo revisa: quitar una lo decide la persona o soporte."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

@@ -9,7 +9,7 @@
 
 Asistente de soporte TI Nivel 1. El plan completo está en [Helpert_Plan_de_desarrollo.md](Helpert_Plan_de_desarrollo.md).
 
-Estado: versión multiempresa funcionando en Linux. Incluye servidor, agente (servicio systemd), bandeja con inicio de sesión, chat, historial, ayuda y perfil, instalador de un archivo, 18 playbooks (13 también en Windows) y consola web con casos por nivel (N1 Helpert, N2 en sitio, N3 analista), empresas con fondo de IA, métricas configurables con exportación CSV y administración, sobre PostgreSQL. El agente y la bandeja también compilan y se prueban para Windows (falta un PC real).
+Estado: versión multiempresa funcionando en Linux. Incluye servidor, agente (servicio systemd), bandeja con inicio de sesión, chat, historial, ayuda y perfil, instalador de un archivo, 99 playbooks (85 en Linux, 90 en Windows y 56 con script de macOS) y consola web con casos por nivel (N1 Helpert, N2 en sitio, N3 analista), empresas con fondo de IA, métricas configurables con exportación CSV y administración, sobre PostgreSQL. El agente y la bandeja también compilan y se prueban para Windows (falta un PC real).
 
 Infraestructura: en la nube. El servidor y la consola van en una VPS detrás de Caddy (HTTPS); los datos, en Supabase (PostgreSQL). La IA principal es Gemini (API de Google) y Ollama es el respaldo.
 
@@ -97,7 +97,15 @@ En el equipo: descomprimir y doble clic en «Instalar Helpert.cmd» (pide permis
 
 Clic en el icono: el panel se despliega en la esquina, como OneDrive; clic derecho: «Abrir Helpert» y «Salir». La bandeja y la guía en pantalla con «Hazlo tú» (SendInput) solo se han comprobado compilando: falta probarlas en un PC real, igual que SmartScreen/Defender con los `.exe` sin firma de código (pedirán confirmación hasta firmarlos con un certificado de editor) y los avisos del sistema (hoy solo cambia el icono).
 
-Playbooks con script de Windows: 13 de 18. Sin script: `audio.mic`, `audio.output`, `bluetooth.restart`, `net.network-drive` y `net.vpn` (dependen de la sesión de la persona y no se pueden hacer ni comprobar bien desde el servicio); en Windows esos casos van a guía o a un técnico.
+Playbooks: 99 en total, 90 con script de Windows. Sin script de Windows: `audio.mic`, `audio.output`, `bluetooth.restart`, `net.network-drive` y `net.vpn` (dependen de la sesión de la persona y no se pueden hacer ni comprobar bien desde el servicio), y los propios de Linux (`app.update-apps`, `disk.boot-space`, `files.home-permissions`, `print.supply-levels`); en Windows esos casos van a guía o a un técnico. Hay 56 scripts de macOS, pero todavía no hay agente para macOS: solo se prueban en la CI.
+
+## Playbooks
+
+Cada carpeta de `playbooks/` tiene `manifest.toml` (lo que lee la IA para elegir: nombre, descripción, riesgo, parámetros) y un script por sistema (`linux.sh`, `windows.ps1`, `macos.sh`) con los pasos `diagnosticar`, `comprobar`, `aplicar`, `verificar` y, si se puede deshacer, `deshacer`. Lo que toca archivos de la persona corre como ella (suplantación en Windows, `runuser`/`sudo -u` en Linux y macOS), nunca como root o SYSTEM.
+
+La CI corre cada script como lo lanza el agente, como root o SYSTEM, en máquinas desechables de GitHub (`playbooks/probar-unix.py` en Ubuntu y macOS, `playbooks/probar-windows.ps1` en Windows): `diagnosticar` siempre y, si dice que hay algo que hacer, también `comprobar`, `aplicar` y `verificar`, salvo los que dejarían a la máquina sin red o la reiniciarían. Lo que una máquina de la CI no tiene (Wi-Fi, impresoras, dominio, USB, batería) solo se prueba en equipos reales. **Nunca corras esas pruebas con `--aplicar` en un equipo de verdad.**
+
+Tras cambiar un playbook, súbele la `version` y vuelve a firmar (`helpert-server firmar playbooks --clave ...`).
 
 ## Pruebas
 

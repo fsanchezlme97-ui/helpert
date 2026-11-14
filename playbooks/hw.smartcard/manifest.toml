@@ -1,0 +1,12 @@
+id = "hw.smartcard"
+version = "0.1.0"
+nombre = "Revisar el lector de tarjetas o DNIe"
+descripcion = "El lector de tarjetas inteligentes, el DNI electrónico o el token de firma no funciona. Revisa si el equipo detecta el lector y reinicia el servicio de tarjetas."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

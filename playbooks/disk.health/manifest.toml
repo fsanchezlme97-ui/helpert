@@ -1,0 +1,12 @@
+id = "disk.health"
+version = "0.1.0"
+nombre = "Revisar la salud del disco"
+descripcion = "El equipo se congela al abrir archivos, hace ruidos o avisa de errores de disco. Lee el estado SMART del disco y dice si conviene cambiarlo. Solo revisa."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

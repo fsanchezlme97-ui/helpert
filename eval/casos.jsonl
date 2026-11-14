@@ -100,3 +100,84 @@
 {"grupo": "fuera", "texto": "quiero conectarme a una red wifi nueva, ¿cuál es la clave?", "so": "linux", "esperado": ["escalar", "guia", "pregunta"], "categoria": "Red y conectividad"}
 {"grupo": "fuera", "texto": "mi memoria USB se cayó al agua y ya no la lee nada", "so": "linux", "esperado": ["escalar", "guia"], "categoria": "Hardware"}
 {"grupo": "fuera", "texto": "todo el equipo se congeló, no se mueve ni el mouse", "so": "linux", "esperado": ["guia", "escalar", "pregunta"]}
+{"grupo": "catalogo-nuevo", "texto": "la intranet no me abre a mí pero a mi compañero sí le abre", "so": "windows", "esperado": "playbook:net.dns-flush", "categoria": "Red y conectividad"}
+{"grupo": "catalogo-nuevo", "texto": "me sale conflicto de dirección ip en la red", "so": "windows", "esperado": "playbook:net.ip-renew", "categoria": "Red y conectividad"}
+{"grupo": "catalogo-nuevo", "texto": "creo que el archivo hosts está bloqueando facebook.com", "so": "windows", "esperado": "playbook:net.hosts-site", "categoria": "Red y conectividad"}
+{"grupo": "catalogo-nuevo", "texto": "el internet está lentísimo hoy, puedes medir la velocidad?", "so": "windows", "esperado": "playbook:net.speed-test", "categoria": "Red y conectividad"}
+{"grupo": "catalogo-nuevo", "texto": "no carga la página del sistema contable, contabilidad.empresa.pe", "so": "windows", "esperado": "playbook:net.site-check", "categoria": "Red y conectividad"}
+{"grupo": "catalogo-nuevo", "texto": "tengo el cable de red conectado pero dice que no hay red", "so": "windows", "esperado": "playbook:net.cable-check", "categoria": "Red y conectividad"}
+{"grupo": "catalogo-nuevo", "texto": "el wifi se me corta a cada rato", "so": "windows", "esperado": "playbook:net.wifi-signal", "categoria": "Red y conectividad"}
+{"grupo": "catalogo-nuevo", "texto": "ya reiniciamos la red y sigue sin funcionar ninguna página, parece que la configuración de red de windows está dañada", "so": "windows", "esperado": "playbook:net.winsock-reset", "categoria": "Red y conectividad"}
+{"grupo": "catalogo-nuevo", "texto": "el navegador dice que hay un error con el servidor proxy", "so": "windows", "esperado": "playbook:net.proxy-check", "categoria": "Red y conectividad"}
+{"grupo": "catalogo-nuevo", "texto": "qué programa me está consumiendo el internet?", "so": "windows", "esperado": "playbook:net.who-uses", "categoria": "Red y conectividad"}
+{"grupo": "catalogo-nuevo", "texto": "me sale un aviso de que el firewall está desactivado", "so": "windows", "esperado": "playbook:security.firewall", "categoria": "Software"}
+{"grupo": "catalogo-nuevo", "texto": "el antivirus dice que las definiciones están desactualizadas", "so": "windows", "esperado": "playbook:security.av-update", "categoria": "Software"}
+{"grupo": "catalogo-nuevo", "texto": "creo que tengo un virus, me salen ventanas raras", "so": "windows", "esperado": "playbook:security.quick-scan", "categoria": "Software"}
+{"grupo": "catalogo-nuevo", "texto": "el antivirus me borró un archivo y no sé qué detectó", "so": "windows", "esperado": "playbook:security.threats", "categoria": "Software"}
+{"grupo": "catalogo-nuevo", "texto": "mi equipo tiene el disco cifrado con bitlocker?", "so": "windows", "esperado": "playbook:security.device-protection", "categoria": "Hardware"}
+{"grupo": "catalogo-nuevo", "texto": "quiénes son administradores de esta computadora?", "so": "windows", "esperado": "playbook:security.admin-users", "categoria": "Cuentas y accesos"}
+{"grupo": "catalogo-nuevo", "texto": "qué puertos tiene abiertos mi equipo?", "so": "windows", "esperado": "playbook:security.open-ports", "categoria": "Red y conectividad"}
+{"grupo": "catalogo-nuevo", "texto": "creo que alguien entró a mi computadora mientras no estaba", "so": "windows", "esperado": "playbook:security.recent-logins", "categoria": "Cuentas y accesos"}
+{"grupo": "catalogo-nuevo", "texto": "imprime una página de prueba en la impresora", "so": "windows", "esperado": "playbook:print.test-page", "categoria": "Impresión"}
+{"grupo": "catalogo-nuevo", "texto": "qué impresoras tengo instaladas?", "so": "windows", "esperado": "playbook:print.status", "categoria": "Impresión"}
+{"grupo": "catalogo-nuevo", "texto": "cuánto tóner le queda a la impresora?", "so": "linux", "esperado": "playbook:print.supply-levels", "categoria": "Impresión"}
+{"grupo": "catalogo-nuevo", "texto": "el escáner no aparece en la computadora", "so": "windows", "esperado": "playbook:print.scanner", "categoria": "Impresión"}
+{"grupo": "catalogo-nuevo", "texto": "no me aparece la opción de imprimir como pdf", "so": "windows", "esperado": "playbook:print.pdf-printer", "categoria": "Impresión"}
+{"grupo": "catalogo-nuevo", "texto": "el disco duro está haciendo ruidos raros", "so": "windows", "esperado": "playbook:disk.health", "categoria": "Hardware"}
+{"grupo": "catalogo-nuevo", "texto": "qué archivos me están ocupando tanto espacio?", "so": "windows", "esperado": "playbook:disk.large-files", "categoria": "Rendimiento del equipo"}
+{"grupo": "catalogo-nuevo", "texto": "vacía mi papelera de reciclaje", "so": "windows", "esperado": "playbook:disk.trash-empty", "categoria": "Archivos y carpetas"}
+{"grupo": "catalogo-nuevo", "texto": "windows dice que hay que examinar y reparar la unidad", "so": "windows", "esperado": "playbook:disk.check-errors", "categoria": "Rendimiento del equipo"}
+{"grupo": "catalogo-nuevo", "texto": "puedes desfragmentar el disco?", "so": "windows", "esperado": "playbook:disk.optimize", "categoria": "Rendimiento del equipo"}
+{"grupo": "catalogo-nuevo", "texto": "la actualización falla porque no hay espacio en /boot", "so": "linux", "esperado": "playbook:disk.boot-space", "categoria": "Rendimiento del equipo"}
+{"grupo": "catalogo-nuevo", "texto": "guardé un documento hace un rato y no sé dónde ni con qué nombre", "so": "windows", "esperado": "playbook:files.recent", "categoria": "Archivos y carpetas"}
+{"grupo": "catalogo-nuevo", "texto": "no puedo borrar el archivo presupuesto porque dice que está abierto en otro programa", "so": "windows", "esperado": "playbook:files.in-use", "categoria": "Archivos y carpetas"}
+{"grupo": "catalogo-nuevo", "texto": "se apagó la computadora y perdí el excel que no había guardado", "so": "windows", "esperado": "playbook:files.office-recover", "categoria": "Ofimática"}
+{"grupo": "catalogo-nuevo", "texto": "el buscador de windows no encuentra nada aunque el archivo existe", "so": "windows", "esperado": "playbook:files.search-index", "categoria": "Archivos y carpetas"}
+{"grupo": "catalogo-nuevo", "texto": "los iconos del escritorio se ven en blanco", "so": "windows", "esperado": "playbook:files.icon-cache", "categoria": "Archivos y carpetas"}
+{"grupo": "catalogo-nuevo", "texto": "tengo muchos archivos repetidos, puedes encontrarlos?", "so": "windows", "esperado": "playbook:files.duplicates", "categoria": "Archivos y carpetas"}
+{"grupo": "catalogo-nuevo", "texto": "guardé encima del informe y necesito la versión de ayer", "so": "windows", "esperado": "playbook:files.previous-versions", "categoria": "Archivos y carpetas"}
+{"grupo": "catalogo-nuevo", "texto": "me dice permiso denegado al guardar en mi propia carpeta", "so": "linux", "esperado": "playbook:files.home-permissions", "categoria": "Archivos y carpetas"}
+{"grupo": "catalogo-nuevo", "texto": "no puedo copiar la carpeta porque dice que la ruta es demasiado larga", "so": "windows", "esperado": "playbook:files.long-paths", "categoria": "Archivos y carpetas"}
+{"grupo": "catalogo-nuevo", "texto": "cuál es el número de serie y la ip de mi computadora?", "so": "windows", "esperado": "playbook:system.info", "categoria": "Hardware"}
+{"grupo": "catalogo-nuevo", "texto": "reinicia mi computadora por favor", "so": "windows", "esperado": "playbook:system.restart", "categoria": "Rendimiento del equipo"}
+{"grupo": "catalogo-nuevo", "texto": "tengo actualizaciones pendientes?", "so": "windows", "esperado": "playbook:system.updates", "categoria": "Software"}
+{"grupo": "catalogo-nuevo", "texto": "windows update falla siempre con un error", "so": "windows", "esperado": "playbook:system.update-repair", "categoria": "Software"}
+{"grupo": "catalogo-nuevo", "texto": "se me abren muchos programas solos al prender la computadora", "so": "windows", "esperado": "playbook:system.startup-apps", "categoria": "Rendimiento del equipo"}
+{"grupo": "catalogo-nuevo", "texto": "la computadora se reinició sola dos veces hoy", "so": "windows", "esperado": "playbook:system.crash-check", "categoria": "Hardware"}
+{"grupo": "catalogo-nuevo", "texto": "la batería de la laptop me dura muy poco", "so": "windows", "esperado": "playbook:system.battery", "categoria": "Hardware"}
+{"grupo": "catalogo-nuevo", "texto": "las letras se ven raras en todos los programas", "so": "windows", "esperado": "playbook:system.fonts-cache", "categoria": "Software"}
+{"grupo": "catalogo-nuevo", "texto": "la laptop se calienta muchísimo y el ventilador suena fuerte", "so": "windows", "esperado": "playbook:system.temperature", "categoria": "Hardware"}
+{"grupo": "catalogo-nuevo", "texto": "crea un punto de restauración antes de instalar", "so": "windows", "esperado": "playbook:system.restore-point", "categoria": "Software"}
+{"grupo": "catalogo-nuevo", "texto": "windows está dando errores raros, creo que hay archivos del sistema dañados", "so": "windows", "esperado": "playbook:system.repair-files", "categoria": "Software"}
+{"grupo": "catalogo-nuevo", "texto": "me sale una marca de agua que dice activar windows", "so": "windows", "esperado": "playbook:system.activation", "categoria": "Software"}
+{"grupo": "catalogo-nuevo", "texto": "la laptop se despierta sola en la noche", "so": "windows", "esperado": "playbook:system.sleep-check", "categoria": "Hardware"}
+{"grupo": "catalogo-nuevo", "texto": "la computadora tarda como diez minutos en prender", "so": "windows", "esperado": "playbook:system.slow-boot", "categoria": "Rendimiento del equipo"}
+{"grupo": "catalogo-nuevo", "texto": "la laptop está en modo ahorro de energía y va lenta", "so": "windows", "esperado": "playbook:system.power-plan", "categoria": "Rendimiento del equipo"}
+{"grupo": "catalogo-nuevo", "texto": "dejaron de funcionar varias cosas del sistema a la vez", "so": "windows", "esperado": "playbook:system.services-check", "categoria": "Software"}
+{"grupo": "catalogo-nuevo", "texto": "la barra de tareas se congeló y no puedo hacer clic en inicio", "so": "windows", "esperado": "playbook:desktop.shell-restart", "categoria": "Rendimiento del equipo"}
+{"grupo": "catalogo-nuevo", "texto": "el teclado dejó de funcionar de repente", "so": "windows", "esperado": "playbook:hw.device-errors", "categoria": "Hardware"}
+{"grupo": "catalogo-nuevo", "texto": "no detecta el segundo monitor", "so": "windows", "esperado": "playbook:hw.display-detect", "categoria": "Hardware"}
+{"grupo": "catalogo-nuevo", "texto": "dice que la privacidad de windows bloquea la cámara", "so": "windows", "esperado": "playbook:hw.privacy-access", "categoria": "Hardware"}
+{"grupo": "catalogo-nuevo", "texto": "el mouse usb no funciona", "so": "windows", "esperado": "playbook:usb.devices", "categoria": "Hardware"}
+{"grupo": "catalogo-nuevo", "texto": "no me deja expulsar la memoria usb, dice que está en uso", "so": "windows", "esperado": "playbook:usb.eject", "categoria": "Hardware"}
+{"grupo": "catalogo-nuevo", "texto": "el lector del dni electrónico no reconoce mi dni", "so": "windows", "esperado": "playbook:hw.smartcard", "categoria": "Hardware"}
+{"grupo": "catalogo-nuevo", "texto": "el lector de huella ya no me reconoce", "so": "windows", "esperado": "playbook:hw.fingerprint", "categoria": "Hardware"}
+{"grupo": "catalogo-nuevo", "texto": "teams se queda en blanco y no carga", "so": "windows", "esperado": "playbook:app.teams-cache", "categoria": "Correo y colaboración"}
+{"grupo": "catalogo-nuevo", "texto": "slack no me muestra los mensajes nuevos", "so": "windows", "esperado": "playbook:app.slack-cache", "categoria": "Correo y colaboración"}
+{"grupo": "catalogo-nuevo", "texto": "zoom se queda cargando y no entra a la reunión", "so": "windows", "esperado": "playbook:app.zoom-cache", "categoria": "Correo y colaboración"}
+{"grupo": "catalogo-nuevo", "texto": "onedrive no está sincronizando mis archivos", "so": "windows", "esperado": "playbook:app.onedrive-status", "categoria": "Archivos y carpetas"}
+{"grupo": "catalogo-nuevo", "texto": "outlook no sincroniza, no me llegan correos nuevos pero en el celular sí", "so": "windows", "esperado": "playbook:mail.outlook-cache", "categoria": "Correo y colaboración"}
+{"grupo": "catalogo-nuevo", "texto": "thunderbird no encuentra correos cuando busco", "so": "windows", "esperado": "playbook:mail.thunderbird-index", "categoria": "Correo y colaboración"}
+{"grupo": "catalogo-nuevo", "texto": "word no abre, se cierra apenas lo abro", "so": "windows", "esperado": "playbook:app.office-repair", "categoria": "Ofimática"}
+{"grupo": "catalogo-nuevo", "texto": "actualiza el office por favor", "so": "windows", "esperado": "playbook:app.office-update", "categoria": "Ofimática"}
+{"grupo": "catalogo-nuevo", "texto": "excel dice producto sin licencia", "so": "windows", "esperado": "playbook:app.office-license", "categoria": "Ofimática"}
+{"grupo": "catalogo-nuevo", "texto": "word me abre todos los documentos con un formato raro", "so": "windows", "esperado": "playbook:app.word-template", "categoria": "Ofimática"}
+{"grupo": "catalogo-nuevo", "texto": "libreoffice se cierra solo apenas lo abro", "so": "windows", "esperado": "playbook:app.libreoffice-reset", "categoria": "Ofimática"}
+{"grupo": "catalogo-nuevo", "texto": "excel se cierra solo a cada rato", "so": "windows", "esperado": "playbook:app.crash-report", "categoria": "Software"}
+{"grupo": "catalogo-nuevo", "texto": "actualiza mis aplicaciones", "so": "linux", "esperado": "playbook:app.update-apps", "categoria": "Software"}
+{"grupo": "catalogo-nuevo", "texto": "firefox dice que ya se está ejecutando pero no está abierto", "so": "windows", "esperado": "playbook:browser.profile-lock", "categoria": "Software"}
+{"grupo": "catalogo-nuevo", "texto": "el navegador me cambió el buscador solo y me salen anuncios", "so": "windows", "esperado": "playbook:browser.extensions", "categoria": "Software"}
+{"grupo": "catalogo-nuevo", "texto": "no me aparecen las unidades que asigna la empresa, parece que no se aplicaron las políticas", "so": "windows", "esperado": "playbook:domain.refresh-policies", "categoria": "Cuentas y accesos"}
+{"grupo": "catalogo-nuevo", "texto": "me sale error de relación de confianza con el dominio", "so": "windows", "esperado": "playbook:domain.check", "categoria": "Cuentas y accesos"}
+{"grupo": "catalogo-nuevo", "texto": "cuándo me vence la contraseña?", "so": "windows", "esperado": "playbook:account.password-expiry", "categoria": "Cuentas y accesos"}
+{"grupo": "catalogo-nuevo", "texto": "a qué grupos pertenece mi usuario?", "so": "windows", "esperado": "playbook:account.groups", "categoria": "Cuentas y accesos"}

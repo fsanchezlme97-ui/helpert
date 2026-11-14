@@ -1,0 +1,10 @@
+id = "system.restore-point"
+version = "0.1.0"
+nombre = "Crear un punto de restauración"
+descripcion = "Antes de un cambio grande, o si soporte lo pide, guarda un punto de restauración de Windows para poder volver atrás."
+riesgo = "bajo"
+deshacer = false
+timeout = 600
+
+[sistemas]
+windows = "windows.ps1"

@@ -1,0 +1,18 @@
+id = "print.test-page"
+version = "0.1.0"
+nombre = "Imprimir una página de prueba"
+descripcion = "Comprobar si una impresora imprime. Envía una página de prueba del sistema. El parámetro impresora es su nombre en una palabra; sin él, usa la predeterminada."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"
+
+[parametros.impresora]
+tipo = "texto"
+requerido = false
+max = 100
+pregunta = "¿Qué impresora? Dime su nombre como aparece al imprimir, por ejemplo HP_Oficina."

@@ -1,0 +1,12 @@
+id = "security.open-ports"
+version = "0.1.0"
+nombre = "Ver los puertos abiertos"
+descripcion = "Saber qué programas aceptan conexiones desde la red. Lista los puertos abiertos y el programa de cada uno. Solo revisa."
+riesgo = "bajo"
+deshacer = false
+timeout = 30
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

@@ -1,0 +1,12 @@
+id = "system.battery"
+version = "0.1.0"
+nombre = "Revisar la batería"
+descripcion = "La batería dura poco, no carga o el equipo se apaga sin avisar. Muestra la carga, la salud, los ciclos y si el cargador está conectado. Solo revisa."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

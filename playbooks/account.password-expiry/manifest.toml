@@ -1,0 +1,12 @@
+id = "account.password-expiry"
+version = "0.1.0"
+nombre = "Ver cuándo vence la contraseña"
+descripcion = "La persona quiere saber cuándo vence su contraseña. Muestra la fecha de vencimiento de su cuenta. Solo revisa: cambiarla lo hace la persona o soporte."
+riesgo = "bajo"
+deshacer = false
+timeout = 30
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

@@ -1,0 +1,11 @@
+id = "system.slow-boot"
+version = "0.1.0"
+nombre = "Ver por qué el equipo arranca lento"
+descripcion = "El equipo tarda mucho en encender o en apagarse. Mide el último arranque y lista lo que más lo retrasa. Solo revisa."
+riesgo = "bajo"
+deshacer = false
+timeout = 120
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"

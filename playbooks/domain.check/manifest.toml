@@ -1,0 +1,12 @@
+id = "domain.check"
+version = "0.1.0"
+nombre = "Revisar la conexión con el dominio"
+descripcion = "Aparece «la relación de confianza con el dominio falló» o no entra la cuenta de la empresa. Revisa si el equipo sigue unido al dominio y llega a sus servidores. Solo revisa."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

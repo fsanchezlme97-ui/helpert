@@ -1,0 +1,10 @@
+id = "system.repair-files"
+version = "0.1.0"
+nombre = "Reparar archivos de Windows"
+descripcion = "Windows da errores raros, programas del sistema no abren o falla al actualizar. Revisa y repara los archivos del sistema (SFC y DISM). Tarda entre 10 y 30 minutos."
+riesgo = "medio"
+deshacer = false
+timeout = 3600
+
+[sistemas]
+windows = "windows.ps1"

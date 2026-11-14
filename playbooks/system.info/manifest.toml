@@ -1,0 +1,12 @@
+id = "system.info"
+version = "0.1.0"
+nombre = "Ver los datos del equipo"
+descripcion = "Soporte o la persona necesita el nombre del equipo, sistema, versión, número de serie, memoria, disco o dirección IP. Los muestra. Solo revisa."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

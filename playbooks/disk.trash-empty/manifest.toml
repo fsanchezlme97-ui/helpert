@@ -1,0 +1,12 @@
+id = "disk.trash-empty"
+version = "0.1.0"
+nombre = "Vaciar la papelera"
+descripcion = "La persona quiere vaciar su papelera. Dice cuánto ocupa y la vacía definitivamente; no se puede deshacer (recuperar algo es «Recuperar un archivo de la papelera»)."
+riesgo = "medio"
+deshacer = false
+timeout = 300
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

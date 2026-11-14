@@ -13,7 +13,7 @@
 # Este archivo lleva BOM para que 5.1 lo lea bien con -File.
 param([switch]$Aplicar)
 $ErrorActionPreference = 'Stop'
-$NO_APLICAR = '^(net\.|system\.restart|system\.update|app\.update|app\.office-(repair|update)|security\.firewall|time\.sync|domain\.|bluetooth\.)'
+$NO_APLICAR = '^(net\.(no-internet|wifi|vpn|network-drive|ip-renew|winsock-reset)|system\.restart|system\.update|app\.update|app\.office-(repair|update)|system\.repair-files|security\.quick-scan|disk\.optimize|security\.firewall|time\.sync|domain\.|bluetooth\.)'
 $raiz = Split-Path -Parent $MyInvocation.MyCommand.Path
 $estricto = New-Object System.Text.UTF8Encoding($false, $true)
 $utf8 = New-Object System.Text.UTF8Encoding $false

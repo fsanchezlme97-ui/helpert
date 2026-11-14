@@ -1,0 +1,10 @@
+id = "app.office-license"
+version = "0.1.0"
+nombre = "Revisar la licencia de Office"
+descripcion = "Office dice «producto sin licencia» o pide activar. Muestra el estado de la licencia. Solo revisa: la licencia la asigna soporte."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+windows = "windows.ps1"

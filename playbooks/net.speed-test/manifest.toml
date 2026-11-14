@@ -1,0 +1,12 @@
+id = "net.speed-test"
+version = "0.1.0"
+nombre = "Medir la velocidad de internet"
+descripcion = "Internet va lento. Mide la latencia y la velocidad de descarga y dice si parece del equipo, del Wi-Fi o de la conexión. Solo mide: no cambia nada."
+riesgo = "bajo"
+deshacer = false
+timeout = 120
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

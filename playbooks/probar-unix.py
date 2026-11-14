@@ -23,7 +23,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent
 SO = {"Linux": "linux", "Darwin": "macos"}[platform.system()]
 PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"  # el del agente
-NO_APLICAR = re.compile(r"^(net\.|system\.restart|system\.update|app\.update|security\.firewall|time\.sync|domain\.|"
+NO_APLICAR = re.compile(r"^(net\.(no-internet|wifi|vpn|network-drive|ip-renew|winsock-reset)|system\.restart|system\.update|app\.update|security\.firewall|time\.sync|domain\.|"
                         r"bluetooth\.|disk\.boot-space)")
 ERRORES_BASH = re.compile(r"command not found|orden no encontrada|unbound variable|syntax error|bad substitution|"
                           r"invalid option|illegal option|unary operator expected|integer expression expected")

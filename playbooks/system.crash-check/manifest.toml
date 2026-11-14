@@ -1,0 +1,12 @@
+id = "system.crash-check"
+version = "0.1.0"
+nombre = "Ver por qué el equipo se apagó solo"
+descripcion = "El equipo se apagó, se reinició solo o mostró una pantalla azul. Busca en los registros del sistema la causa de los últimos apagados inesperados. Solo revisa."
+riesgo = "bajo"
+deshacer = false
+timeout = 120
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

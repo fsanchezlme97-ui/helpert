@@ -1,0 +1,11 @@
+id = "disk.optimize"
+version = "0.1.0"
+nombre = "Optimizar el disco"
+descripcion = "El disco va lento. Ejecuta la optimización del sistema: TRIM en discos SSD o desfragmentación en discos mecánicos."
+riesgo = "bajo"
+deshacer = false
+timeout = 1800
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"

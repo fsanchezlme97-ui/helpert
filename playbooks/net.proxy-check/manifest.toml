@@ -1,0 +1,12 @@
+id = "net.proxy-check"
+version = "0.1.0"
+nombre = "Revisar el proxy del equipo"
+descripcion = "Las páginas dicen error de proxy o no carga ninguna aunque hay red. Muestra el proxy configurado y prueba si responde. Solo revisa: cambiar el proxy lo hace soporte."
+riesgo = "bajo"
+deshacer = false
+timeout = 30
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

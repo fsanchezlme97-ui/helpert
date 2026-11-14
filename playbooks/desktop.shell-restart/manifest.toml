@@ -1,0 +1,12 @@
+id = "desktop.shell-restart"
+version = "0.1.0"
+nombre = "Reiniciar la barra de tareas y el escritorio"
+descripcion = "La barra de tareas, el menú Inicio, el Dock o el escritorio no responden, pero los programas sí. Reinicia el escritorio de la persona sin cerrar sus programas."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

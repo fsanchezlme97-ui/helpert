@@ -1,0 +1,10 @@
+id = "hw.privacy-access"
+version = "0.1.0"
+nombre = "Permitir la cámara y el micrófono en Windows"
+descripcion = "Windows bloquea la cámara o el micrófono a todos los programas por privacidad. Vuelve a permitirlos a nivel del equipo, salvo que lo prohíba una política de la empresa."
+riesgo = "bajo"
+deshacer = false
+timeout = 30
+
+[sistemas]
+windows = "windows.ps1"

@@ -1,0 +1,10 @@
+id = "disk.boot-space"
+version = "0.1.0"
+nombre = "Liberar espacio en /boot"
+descripcion = "Las actualizaciones de Linux fallan porque /boot está lleno. Quita núcleos antiguos que ya no se usan, dejando el actual y el anterior."
+riesgo = "medio"
+deshacer = false
+timeout = 600
+
+[sistemas]
+linux = "linux.sh"

@@ -1,0 +1,11 @@
+id = "app.onedrive-status"
+version = "0.1.0"
+nombre = "Revisar OneDrive"
+descripcion = "OneDrive no sincroniza o muestra errores. Revisa si OneDrive está abierto para la persona, su versión, su carpeta y el espacio libre. Solo revisa."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+windows = "windows.ps1"
+macos = "macos.sh"

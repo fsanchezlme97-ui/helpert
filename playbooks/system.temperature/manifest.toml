@@ -1,0 +1,12 @@
+id = "system.temperature"
+version = "0.1.0"
+nombre = "Revisar la temperatura del equipo"
+descripcion = "El equipo se calienta mucho, el ventilador hace ruido o se apaga por calor. Mide la temperatura y qué programas usan más procesador. Solo revisa (limpiarlo lo hace un técnico)."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

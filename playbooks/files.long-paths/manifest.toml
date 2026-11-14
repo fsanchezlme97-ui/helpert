@@ -1,0 +1,10 @@
+id = "files.long-paths"
+version = "0.1.0"
+nombre = "Permitir rutas largas"
+descripcion = "Windows dice que el nombre o la ruta del archivo es demasiado largo. Activa en el sistema las rutas de más de 260 caracteres. Se puede deshacer."
+riesgo = "bajo"
+deshacer = true
+timeout = 30
+
+[sistemas]
+windows = "windows.ps1"

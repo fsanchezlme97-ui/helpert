@@ -1,0 +1,12 @@
+id = "app.zoom-cache"
+version = "0.1.0"
+nombre = "Limpiar los datos de Zoom"
+descripcion = "Zoom no abre, se queda cargando o falla al entrar a reuniones. Cierra Zoom de la persona y borra sus datos temporales; hay que volver a iniciar sesión en Zoom."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

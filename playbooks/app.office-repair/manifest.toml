@@ -1,0 +1,10 @@
+id = "app.office-repair"
+version = "0.1.0"
+nombre = "Reparar Microsoft Office"
+descripcion = "Word, Excel, Outlook u otro programa de Office no abre o da errores. Ejecuta la reparación rápida de Office; hay que cerrar Office antes."
+riesgo = "medio"
+deshacer = false
+timeout = 1800
+
+[sistemas]
+windows = "windows.ps1"

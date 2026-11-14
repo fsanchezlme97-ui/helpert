@@ -1,0 +1,12 @@
+id = "files.duplicates"
+version = "0.1.0"
+nombre = "Buscar archivos duplicados"
+descripcion = "La persona quiere saber si tiene archivos repetidos que ocupan espacio. Busca copias idénticas en su carpeta personal. Solo revisa: no borra nada."
+riesgo = "bajo"
+deshacer = false
+timeout = 600
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

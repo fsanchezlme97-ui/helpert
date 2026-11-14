@@ -1,0 +1,12 @@
+id = "files.office-recover"
+version = "0.1.0"
+nombre = "Recuperar un documento sin guardar"
+descripcion = "Word, Excel, PowerPoint o LibreOffice se cerraron y se perdió un documento sin guardar. Busca las copias de recuperación automática y las copia a «Recuperados» en Documentos."
+riesgo = "bajo"
+deshacer = false
+timeout = 120
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

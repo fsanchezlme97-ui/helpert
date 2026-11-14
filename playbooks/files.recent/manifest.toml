@@ -1,0 +1,12 @@
+id = "files.recent"
+version = "0.1.0"
+nombre = "Ver los archivos modificados recientemente"
+descripcion = "La persona guardó un archivo y no recuerda dónde ni con qué nombre. Lista los últimos archivos que modificó en su carpeta personal. Para buscar por nombre es «Buscar un archivo»."
+riesgo = "bajo"
+deshacer = false
+timeout = 120
+
+[sistemas]
+linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"
