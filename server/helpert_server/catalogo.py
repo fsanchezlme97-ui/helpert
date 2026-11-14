@@ -110,6 +110,18 @@ def generar_claves(destino: Path) -> tuple[Path, Path]:
     return priv, pub
 
 
+def firma_valida(paquete: Path, clave_publica: Path) -> bool:
+    """¿La firma del paquete es de la clave privada que va con esta pública? (lo mismo que comprueba el agente)"""
+    from cryptography.exceptions import InvalidSignature
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+    try:
+        pub = Ed25519PublicKey.from_public_bytes(bytes.fromhex(Path(clave_publica).read_text().strip()))
+        pub.verify(bytes.fromhex((Path(paquete) / FIRMA).read_text().strip()), mensaje_paquete(paquete))
+        return True
+    except (InvalidSignature, ValueError, OSError, ErrorCatalogo):
+        return False
+
+
 def firmar(carpeta: Path, clave_privada: Path) -> None:
     clave = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(Path(clave_privada).read_text().strip()))
     for m in sorted(Path(carpeta).glob("*/manifest.toml")):

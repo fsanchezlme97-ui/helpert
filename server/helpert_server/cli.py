@@ -25,6 +25,59 @@ def leer_config(ruta: str) -> dict:
     return cfg
 
 
+def revisar(cfg: dict) -> list[tuple[str, str]]:
+    """Lista de comprobación antes de abrir el servidor a los equipos: (estado, texto) con estado «bien», «aviso»
+    (conviene, no impide) o «falta» (hay que arreglarlo)."""
+    r = []
+    try:
+        db.iniciar(cfg["base_datos"])
+        with db.conexion(cfg["base_datos"]) as c:
+            aj = ajustes.leer(c, cfg)
+            admins = c.execute("SELECT count(*) AS n FROM usuarios_consola WHERE rol = 'admin' AND activo").fetchone()["n"]
+        r.append(("bien", "Base de datos: responde y el esquema está al día"))
+    except Exception as e:  # sin base no se puede revisar lo demás
+        return [("falta", f"Base de datos: {type(e).__name__}: {e}")]
+    r.append(("bien", f"Cuentas de administración: {admins}") if admins else
+             ("falta", "No hay ninguna cuenta admin: helpert-server usuario-consola CORREO --rol admin"))
+    if not os.environ.get(ajustes.MAESTRA_ENV):
+        r.append(("falta", f"{ajustes.MAESTRA_ENV} no está: sin ella no se pueden guardar claves de API en la consola"))
+    elif ajustes._fernet() is None:
+        r.append(("falta", f"{ajustes.MAESTRA_ENV} no es válida (32 bytes en base64 url)"))
+    else:
+        r.append(("bien", f"{ajustes.MAESTRA_ENV}: presente (guárdala aparte: sin ella, las claves de API guardadas no se leen)"))
+    ins = aj["inscripcion"]
+    con_clave = ins["clave_sha"] or (cfg.get("inscripcion_env") and os.environ.get(cfg["inscripcion_env"]))
+    r.append(("bien", "Inscripción de equipos: activa") if ins["activa"] and con_clave else
+             ("aviso", "Inscripción de equipos: sin clave o desactivada (los instaladores no podrán registrar equipos)"))
+    pub = cfg.get("clave_publica")
+    if not pub or not Path(pub).is_file():
+        r.append(("falta", f"Clave pública de los playbooks: no está ({pub or 'clave_publica sin poner'})"))
+    else:
+        paquetes = sorted(Path(cfg["playbooks"]).glob("*/manifest.toml"))
+        malos = [m.parent.name for m in paquetes if not cat.firma_valida(m.parent, Path(pub))]
+        if not paquetes:
+            r.append(("falta", f"Playbooks: no hay ninguno en {cfg['playbooks']}"))
+        elif malos:
+            r.append(("falta", f"Playbooks sin firma válida para esta clave pública: {', '.join(malos)}"))
+        else:
+            todos = cat.cargar(cfg["playbooks"]).values()
+            win = sum("windows" in pb.sistemas for pb in todos)
+            r.append(("bien", f"Playbooks: {len(paquetes)} firmados ({win} con Windows)"))
+    aj["ia"] = [p for p in aj["ia"] if p.get("activo", True)]
+    externos = [p for p in aj["ia"] if not p.get("local")]
+    sin_clave = [p["proveedor"] for p in externos if p["proveedor"] != "ollama" and not p.get("clave_cifrada")
+                 and not (p.get("clave_env") and os.environ.get(p["clave_env"]))]
+    if not aj["ia"]:
+        r.append(("aviso", "IA: la cadena está vacía; Helpert solo ofrecerá el menú de playbooks"))
+    elif sin_clave:
+        r.append(("falta", f"IA: sin clave de API para {', '.join(sin_clave)} (Consola → Administración → IA)"))
+    else:
+        r.append(("bien", "IA: " + " → ".join(f"{p['proveedor']} {p['modelo']}" for p in aj["ia"])))
+    r.append(("bien", "Correo: códigos de acceso por correo") if cfg.get("smtp") else
+             ("aviso", "Correo: sin [smtp]; los códigos de acceso los genera soporte en la consola"))
+    return r
+
+
 def evaluar(cfg: dict, casos_ruta: str, indice: int, pausa: float = 0) -> dict:
     """Corre los casos etiquetados contra UN proveedor de la cadena (sin respaldo) y mide. La cadena, las categorías
     y los playbooks activos son los vigentes (los de la consola), así se evalúa lo que de verdad se usa."""
@@ -106,6 +159,7 @@ def main(argv=None):
     s.add_argument("--version", required=True)
     s.add_argument("--so", default="linux", choices=("linux", "windows"))
     s.add_argument("--firma", required=True, help="Archivo .firma que dejó firmar-agente")
+    sub.add_parser("revisar", help="Comprueba la configuración antes de abrir el servidor a los equipos")
     sub.add_parser("purgar", help="Borra las capturas vencidas (también lo hace el servidor cada hora)")
     s = sub.add_parser("usuario-consola", help="Crea una persona de la consola web o le cambia la contraseña")
     s.add_argument("email")
@@ -137,13 +191,21 @@ def main(argv=None):
         return
 
     cfg = leer_config(a.config)
+    if a.orden == "revisar":
+        marcas = {"bien": "✓", "aviso": "!", "falta": "✗"}
+        lista = revisar(cfg)
+        for estado, texto in lista:
+            print(f" {marcas[estado]} {texto}")
+        sys.exit(1 if any(e == "falta" for e, _ in lista) else 0)
     if a.orden == "servir":
         import uvicorn
         from .app import crear_app
         if a.host not in ("127.0.0.1", "localhost", "::1"):
             # shortcut: token por equipo sin TLS; antes de exponerlo en la red, poner TLS mutuo (ver el plan).
             print("Aviso: sin TLS. Solo para pruebas.", file=sys.stderr)
-        uvicorn.run(crear_app(cfg), host=a.host, port=a.puerto)
+        # detrás de Caddy en el mismo equipo: la IP y el https de la persona vienen en X-Forwarded-*; solo se creen
+        # si la conexión llega desde 127.0.0.1 (el límite de intentos de la consola y la cookie Secure dependen de esto)
+        uvicorn.run(crear_app(cfg), host=a.host, port=a.puerto, proxy_headers=True, forwarded_allow_ips="127.0.0.1")
     elif a.orden == "equipo-nuevo":
         db.iniciar(cfg["base_datos"])
         print(db.equipo_nuevo(cfg["base_datos"], a.nombre))

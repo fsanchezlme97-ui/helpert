@@ -114,6 +114,16 @@ def crear_app(cfg: dict) -> FastAPI:
     app = FastAPI(title="Helpert", docs_url=None, redoc_url=None, openapi_url=None)  # expuesto en internet: sin documentación pública
     inscripcion = os.environ.get(cfg["inscripcion_env"], "") if cfg.get("inscripcion_env") else ""
 
+    @app.get("/salud", include_in_schema=False)
+    def salud():
+        """Para el monitoreo (y el proxy): 200 si la base responde, 503 si no. No dice nada más."""
+        try:
+            with db.conexion(ruta) as c:
+                c.execute("SELECT 1")
+        except psycopg.Error:
+            raise HTTPException(503, "Sin base de datos") from None
+        return {"ok": True}
+
     @app.post("/v1/inscribir")
     def inscribir(i: Inscripcion):
         """El instalador registra el equipo con la clave de inscripción de la organización y recibe su token.
