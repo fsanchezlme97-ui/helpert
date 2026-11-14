@@ -1,0 +1,2 @@
+# Las firmas cubren los bytes: nunca convertir finales de línea al hacer checkout en Windows.
+* -text
