@@ -2,9 +2,11 @@
 # Devolver a la persona la propiedad de los archivos de su carpeta personal que quedaron a nombre de otra cuenta
 # (típico tras usar sudo). Cambiar el dueño necesita root, así que aquí no se puede actuar como la persona; por eso:
 # - solo cuentas de personas (UID 501 o más) con la carpeta en /Users;
-# - sin cruzar a otros discos (-xdev);
-# - chown -h (un enlace no lleva a otro archivo) desde -execdir (un cambio de carpeta en medio no lleva fuera);
-# - archivos con un solo enlace duro: uno del sistema enlazado dentro de su carpeta no pasa a ser suyo.
+# - sin cruzar a otros discos (-xdev) ni tocar la raíz de uno montado dentro;
+# - macOS deja enlazar (enlace duro) archivos ajenos, y la persona podría cambiar uno por un enlace a uno del sistema
+#   justo antes del cambio. Por eso cada entrada se abre sin seguir enlaces, se revisa lo abierto (mismo disco, de otra
+#   cuenta, carpeta o archivo con un solo enlace) y se cambia el dueño de eso mismo (fchown), no del nombre;
+# - los enlaces simbólicos no se tocan: su dueño no impide guardar ni borrar.
 # Solo cambia el dueño. macOS puede negar el acceso a carpetas protegidas (TCC): si pasa, se dice.
 set -u
 usuario=${HP_USUARIO:-}
@@ -30,7 +32,15 @@ tope() {  # corre «$2...» con un tope de $1 segundos (macOS no trae timeout); 
   if kill -0 "$v" 2>/dev/null; then kill "$v" 2>/dev/null; else c=124; fi
   return "$c"
 }
-ajenos() { find "$casa" -xdev ! -user "$uid" \( -type d -o -type l -o \( -type f -links 1 \) \) "$@"; }
+ajenos() { find "$casa" -xdev ! -user "$uid" \( -type d -o \( -type f -links 1 \) \) "$@"; }
+# argumentos: uid, disco de la carpeta personal y los nombres (relativos a la carpeta de cada uno, por -execdir)
+devolver='use Fcntl; my ($u, $d) = splice(@ARGV, 0, 2);
+for (@ARGV) {
+  sysopen(my $f, $_, O_RDONLY | O_NOFOLLOW | O_NONBLOCK) or next;
+  my @s = stat($f) or next;
+  next if $s[0] != $d || $s[4] == $u || !(-d _ || (-f _ && $s[3] == 1));
+  chown($u, -1, $f);
+}'
 cuantos() { ajenos -print 2>/dev/null | wc -l | tr -d ' '; }
 
 case ${1:-} in
@@ -61,7 +71,8 @@ comprobar)
 aplicar)
   puedo || exit 1
   n=$(cuantos)
-  ajenos -execdir chown -h "$uid" {} + 2>/dev/null
+  [ -x /usr/bin/perl ] || { echo "Falta una herramienta de macOS (perl) para hacerlo con seguridad. Pide a soporte que lo revise."; exit 1; }
+  ajenos -execdir /usr/bin/perl -e "$devolver" "$uid" "$(stat -f %d "$casa")" {} + 2>/dev/null
   q=$(cuantos)
   [ "${q:-0}" -eq 0 ] || { echo "Devolví $((n - q)) archivo(s), pero no pude con $q: pide a soporte que lo revise."; exit 1; }
   echo "Te devolví $n archivo(s) o carpeta(s) de tu carpeta personal. Prueba de nuevo a guardar o cambiar el archivo."

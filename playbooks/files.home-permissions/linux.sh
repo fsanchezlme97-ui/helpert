@@ -2,7 +2,10 @@
 # Devolver a la persona la propiedad de los archivos de su carpeta personal que quedaron a nombre de otra cuenta
 # (típico tras usar sudo). Cambiar el dueño necesita root, así que aquí no se puede actuar como la persona; por eso:
 # - solo cuentas de personas (UID 1000 o más) con la carpeta en /home o /var/home;
-# - sin cruzar a otros discos (-xdev) ni entrar en los contenedores sin root (usan cuentas propias a propósito);
+# - sin cruzar a otros discos (-xdev) ni tocar la raíz de un disco montado dentro, ni entrar en los contenedores sin root
+#   (usan cuentas propias a propósito);
+# - solo si el sistema no deja enlazar archivos ajenos (fs.protected_hardlinks = 1): si no, la persona podría cambiar un
+#   archivo por un enlace a uno del sistema justo antes del chown;
 # - chown -h (un enlace no lleva a otro archivo) desde -execdir (un cambio de carpeta en medio no lleva fuera);
 # - archivos con un solo enlace duro: uno del sistema enlazado dentro de su carpeta no pasa a ser suyo.
 # Solo cambia el dueño: el grupo y los permisos quedan igual.
@@ -20,9 +23,16 @@ puedo() {
   esac
   [ "$ok" = 1 ] || { echo "Tu carpeta personal ($casa) no está donde suelen estar: no la toco. Pide a soporte que la revise."; return 1; }
   [ "$(id -u)" -eq 0 ] || { echo "Helpert necesita privilegios de administrador para cambiar a quién pertenecen los archivos."; return 1; }
+  [ "$(cat /proc/sys/fs/protected_hardlinks 2>/dev/null)" = 1 ] || { echo "Este equipo no tiene activada una protección del sistema (fs.protected_hardlinks) y no es seguro cambiar el dueño de los archivos. Pide a soporte que lo revise."; return 1; }
 }
+patron() { sed 's/[][*?\\]/\\&/g' <<< "$1"; }  # para -path: el nombre tal cual, sin comodines
 ajenos() {
-  timeout 500 find "$casa" -xdev \( -path "$casa/.local/share/containers" -o -path "$casa/.local/share/docker" \) -prune \
+  local m poda=(-path "$(patron "$casa")/.local/share/containers" -o -path "$(patron "$casa")/.local/share/docker")
+  while read -r _ _ _ _ m _; do  # discos montados dentro de la carpeta: ni su raíz (-xdev no baja, pero la toca)
+    m=$(printf '%b' "$m")  # mountinfo escribe los espacios como \040
+    case $m in "$casa"/*) poda+=(-o -path "$(patron "$m")") ;; esac
+  done < /proc/self/mountinfo
+  timeout 500 find "$casa" -xdev \( "${poda[@]}" \) -prune \
     -o ! -user "$uid" \( -type d -o -type l -o \( -type f -links 1 \) \) "$@" 2>/dev/null
 }
 
