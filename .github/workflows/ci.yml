@@ -28,10 +28,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-      - name: Agente
-        run: cd agente; cargo test -q; cargo build --release -q
+      - name: Agente  # con la preferencia, un cargo que falla para el paso (si no, solo cuenta el último de la línea)
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          cd agente; cargo test -q; cargo build --release -q
       - name: Bandeja
-        run: cd bandeja; cargo test -q; cargo build --release -q
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          cd bandeja; cargo test -q; cargo build --release -q
       - name: Scripts de los playbooks (PowerShell 5.1)
         shell: powershell
         run: .\playbooks\probar-windows.ps1
