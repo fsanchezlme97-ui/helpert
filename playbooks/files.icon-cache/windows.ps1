@@ -1,7 +1,8 @@
 # Borrar la caché de iconos y miniaturas de la persona (AppData\Local\IconCache.db y Microsoft\Windows\Explorer\
 # iconcache_*.db / thumbcache_*.db); se rehace sola. Se borra con el token de la persona, nunca como SYSTEM.
-# El Explorador no se cierra (es el escritorio): los archivos que tenga abiertos no se pueden borrar y se rehacen al
-# cerrar sesión. Después, «ie4uinit -show» en su sesión (tarea programada como ella) le pide que refresque los iconos.
+# El Explorador de la persona (solo el suyo, por SID) tiene esos archivos abiertos: se cierra un momento para borrarlos
+# y Windows lo vuelve a abrir; si no vuelve, se abre en su sesión con una tarea programada como ella (y se borra).
+# Sus programas no se cierran; las ventanas de carpetas sí. Lo que otro programa tenga abierto se rehace al cerrar sesión.
 $ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue'
 
 function SidDe($cuenta) {  # solo cuentas de personas (locales, de dominio o de Entra ID), nunca SYSTEM ni de servicio
@@ -21,6 +22,10 @@ function Token($sid) {
 function ComoPersona($tok, [scriptblock]$b) {
   if ($tok -is [string]) { & $b } else { [Security.Principal.WindowsIdentity]::RunImpersonated($tok, [Action]$b) }
 }
+function Suyos {  # explorer.exe de la persona
+  @(Get-CimInstance Win32_Process -Filter "Name='explorer.exe'" | Where-Object { $o = (Invoke-CimMethod -InputObject $_ -MethodName GetOwnerSid -ErrorAction SilentlyContinue).Sid; $o -and $o -eq $sid })
+}
+function Esperar($seg) { for ($i = 0; $i -lt $seg; $i++) { if (@(Suyos).Count) { return $true }; Start-Sleep -Seconds 1 }; @(Suyos).Count -gt 0 }
 function Preparar {
   $script:sid = SidDe $env:HP_USUARIO
   if (-not $sid) { return 'No sé qué persona lo pide.' }
@@ -41,18 +46,15 @@ function Buscar {
 function Borrar { foreach ($f in $cache) { try { $f.Delete(); $cuenta.Bien++ } catch { $cuenta.Usados++ } } }
 function Viejos { $hace = [DateTime]::Now.AddMinutes(-10); @($cache | Where-Object { $_.LastWriteTime -lt $hace }).Count }
 function MB { $b = 0; foreach ($f in $cache) { $b += $f.Length }; [math]::Round($b / 1MB) }
-# ie4uinit -show en la sesión de la persona; si no se puede, no pasa nada: se rehacen al cerrar sesión
-function Refrescar {
-  $ie = [IO.Path]::Combine($env:SystemRoot, 'System32\ie4uinit.exe')
-  if (-not [IO.File]::Exists($ie)) { return }
+function AbrirComoPersona {  # explorer.exe en la sesión de la persona, con su cuenta
   $t = 'Helpert-iconos-' + [guid]::NewGuid().ToString('N').Substring(0, 8)
   try {
-    $a = New-ScheduledTaskAction -Execute $ie -Argument '-show'
+    $a = New-ScheduledTaskAction -Execute "$env:SystemRoot\explorer.exe"
     $p = New-ScheduledTaskPrincipal -UserId $env:HP_USUARIO -LogonType Interactive
-    $null = Register-ScheduledTask -TaskName $t -Action $a -Principal $p -Force
+    $c = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries  # si no, con batería no arranca
+    $null = Register-ScheduledTask -TaskName $t -Action $a -Principal $p -Settings $c -Force
     Start-ScheduledTask -TaskName $t
-    Start-Sleep -Seconds 1
-    for ($i = 0; $i -lt 20 -and "$((Get-ScheduledTask -TaskName $t).State)" -in 'Running', 'Queued'; $i++) { Start-Sleep -Milliseconds 500 }
+    $null = Esperar 10
   } catch {} finally { try { Unregister-ScheduledTask -TaskName $t -Confirm:$false } catch {} }
 }
 $cache = New-Object Collections.Generic.List[object]
@@ -65,7 +67,7 @@ try {
       $null = ComoPersona $tok { Buscar }
       if ($cache.Count -eq 0) { 'No encontré caché de iconos ni de miniaturas en tu carpeta: no hay nada que borrar.'; 'Si los iconos siguen en blanco, cierra sesión y vuelve a entrar.'; exit 10 }
       "Tu caché de iconos y miniaturas tiene $($cache.Count) archivo(s) y ocupa $(MB) MB."
-      'Si sigo, la borro y se rehace sola. Lo que el Explorador tenga abierto se rehace cuando cierres sesión y vuelvas a entrar.'
+      'Si sigo, cierro un momento tu Explorador para borrarla (la barra de tareas parpadea y se cierran las ventanas de carpetas; tus programas siguen abiertos) y se rehace sola.'
       exit 0
     }
     'comprobar' {
@@ -76,19 +78,27 @@ try {
       $m = Preparar; if ($m) { $m; exit 1 }
       $null = ComoPersona $tok { Buscar }
       $mb = MB
+      # el token ya está tomado (Token lo saca de la sesión, no del proceso): cerrar el Explorador no lo invalida
+      $ex = @(Suyos)
+      foreach ($x in $ex) { Stop-Process -Id $x.ProcessId -Force -ErrorAction SilentlyContinue }
+      foreach ($x in $ex) { Wait-Process -Id $x.ProcessId -Timeout 5 -ErrorAction SilentlyContinue }
       $null = ComoPersona $tok { Borrar }
-      Refrescar
-      if ($cuenta.Bien -eq 0 -and $cuenta.Usados) { 'No pude borrar la caché: el Explorador la está usando. Cierra sesión y vuelve a entrar para que se rehaga.'; exit 1 }
-      "Borré $($cuenta.Bien) archivo(s) de la caché de iconos y miniaturas (de $mb MB en total) y le pedí a Windows que refresque los iconos."
-      if ($cuenta.Usados) { "$($cuenta.Usados) archivo(s) estaban en uso por el Explorador: se rehacen cuando cierres sesión y vuelvas a entrar." }
+      if ($ex.Count) {
+        Start-Sleep -Seconds 2
+        if (-not (Esperar 10)) { AbrirComoPersona }
+        if (-not (Esperar 1)) { 'Borré la caché, pero tu escritorio no volvió a abrirse. Cierra sesión y vuelve a entrar.'; exit 1 }
+      }
+      if ($cuenta.Bien -eq 0 -and $cuenta.Usados) { 'No pude borrar la caché: otro programa la está usando. Cierra sesión y vuelve a entrar para que se rehaga.'; exit 1 }
+      "Borré $($cuenta.Bien) archivo(s) de la caché de iconos y miniaturas (de $mb MB en total); se rehace sola."
+      if ($cuenta.Usados) { "$($cuenta.Usados) archivo(s) estaban en uso por otro programa: se rehacen cuando cierres sesión y vuelvas a entrar." }
       exit 0
     }
     'verificar' {
       $m = Preparar; if ($m) { $m; exit 1 }
       $null = ComoPersona $tok { Buscar }
       $v = Viejos
-      if ($v -gt 0 -and $v -eq $cache.Count) { 'La caché antigua sigue ahí: el Explorador la está usando. Cierra sesión y vuelve a entrar para que se rehaga.'; exit 1 }
-      if ($v -gt 0) { "Quedan $v archivo(s) de la caché antigua en uso por el Explorador: se rehacen cuando cierres sesión y vuelvas a entrar." }
+      if ($v -gt 0 -and $v -eq $cache.Count) { 'La caché antigua sigue ahí: otro programa la está usando. Cierra sesión y vuelve a entrar para que se rehaga.'; exit 1 }
+      if ($v -gt 0) { "Quedan $v archivo(s) de la caché antigua en uso por otro programa: se rehacen cuando cierres sesión y vuelvas a entrar." }
       else { 'La caché antigua ya no está. Si algún icono sigue en blanco, cierra sesión y vuelve a entrar.' }
       exit 0
     }

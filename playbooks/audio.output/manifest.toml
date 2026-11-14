@@ -1,5 +1,5 @@
 id = "audio.output"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Recuperar el sonido"
 descripcion = "No se escucha nada en el equipo, el sonido está silenciado o muy bajo, o se perdió el audio en una reunión. Quita el silencio, sube el volumen al 60 % si estaba bajo y reinicia el servicio de sonido de la sesión si estaba caído. No sirve para parlantes o audífonos dañados o desconectados."
 riesgo = "bajo"
@@ -8,3 +8,5 @@ timeout = 60
 
 [sistemas]
 linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

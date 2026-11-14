@@ -1,5 +1,5 @@
 id = "bluetooth.restart"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Reactivar el Bluetooth"
 descripcion = "El Bluetooth no enciende, no aparece o los audífonos, mouse o teclado Bluetooth dejaron de conectarse. Quita el bloqueo de radio, reinicia el servicio de Bluetooth y lo enciende. No empareja dispositivos nuevos ni arregla uno sin batería."
 riesgo = "bajo"
@@ -8,3 +8,5 @@ timeout = 60
 
 [sistemas]
 linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

@@ -1,5 +1,6 @@
 //! Canal local entre el servicio del equipo y sus clientes (la bandeja y el chat de terminal): una línea JSON
-//! por petición. Linux: socket Unix en /run/helpert (de root). Windows: tubería con nombre de SYSTEM.
+//! por petición. Linux: socket Unix en /run/helpert (de root); macOS: en /var/run/helpert. Windows: tubería con nombre
+//! de SYSTEM.
 //!
 //! La bandeja incluye este archivo tal cual (`#[path]`), así que solo usa std y windows-sys.
 
@@ -8,8 +9,10 @@ pub type Conexion = std::os::unix::net::UnixStream;
 #[cfg(windows)]
 pub type Conexion = std::fs::File;
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "macos")))]
 pub const RUTA: &str = "/run/helpert/agente.sock";
+#[cfg(target_os = "macos")]
+pub const RUTA: &str = "/var/run/helpert/agente.sock";
 #[cfg(windows)]
 pub const RUTA: &str = r"\\.\pipe\helpert-agente";
 

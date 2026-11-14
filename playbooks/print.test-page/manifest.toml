@@ -1,5 +1,5 @@
 id = "print.test-page"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Imprimir una página de prueba"
 descripcion = "Comprobar si una impresora imprime. Envía una página de prueba del sistema. El parámetro impresora es su nombre en una palabra; sin él, usa la predeterminada."
 riesgo = "bajo"

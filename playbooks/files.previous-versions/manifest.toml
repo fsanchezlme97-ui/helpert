@@ -1,13 +1,14 @@
 id = "files.previous-versions"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Recuperar una versión anterior de un archivo"
-descripcion = "La persona guardó cambios por error en un documento. Busca versiones anteriores en las instantáneas del sistema y copia la más reciente al lado con otro nombre. El parámetro archivo es una palabra del nombre."
+descripcion = "La persona guardó cambios por error en un documento. Busca versiones anteriores en las instantáneas del sistema (en macOS, las instantáneas locales de Time Machine) y copia la más reciente al lado con otro nombre. El parámetro archivo es una palabra del nombre."
 riesgo = "bajo"
 deshacer = false
 timeout = 300
 
 [sistemas]
 windows = "windows.ps1"
+macos = "macos.sh"
 
 [parametros.archivo]
 tipo = "texto"

@@ -1,10 +1,11 @@
 id = "system.restore-point"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Crear un punto de restauración"
-descripcion = "Antes de un cambio grande, o si soporte lo pide, guarda un punto de restauración de Windows para poder volver atrás."
+descripcion = "Antes de un cambio grande, o si soporte lo pide, guarda un punto de restauración de Windows, o una instantánea local de Time Machine en macOS (dura unas 24 horas), para poder volver atrás."
 riesgo = "bajo"
 deshacer = false
 timeout = 600
 
 [sistemas]
 windows = "windows.ps1"
+macos = "macos.sh"

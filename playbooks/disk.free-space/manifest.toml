@@ -1,5 +1,5 @@
 id = "disk.free-space"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Liberar espacio en disco"
 descripcion = "El disco está lleno o casi lleno, no se pueden guardar archivos o el sistema avisa de poco espacio. Borra temporales de más de 7 días, cachés del usuario de más de 30 días y registros antiguos del sistema. No toca documentos ni la papelera."
 riesgo = "bajo"
@@ -9,3 +9,4 @@ timeout = 300
 [sistemas]
 linux = "linux.sh"
 windows = "windows.ps1"
+macos = "macos.sh"

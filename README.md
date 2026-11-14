@@ -9,7 +9,7 @@
 
 Asistente de soporte TI Nivel 1. El plan completo está en [Helpert_Plan_de_desarrollo.md](Helpert_Plan_de_desarrollo.md).
 
-Estado: versión multiempresa funcionando en Linux. Incluye servidor, agente (servicio systemd), bandeja con inicio de sesión, chat, historial, ayuda y perfil, instalador de un archivo, 99 playbooks (85 en Linux, 90 en Windows y 56 con script de macOS) y consola web con casos por nivel (N1 Helpert, N2 en sitio, N3 analista), empresas con fondo de IA, métricas configurables con exportación CSV y administración, sobre PostgreSQL. El agente y la bandeja también compilan y se prueban para Windows (falta un PC real).
+Estado: versión multiempresa funcionando en Linux. Incluye servidor, agente (servicio systemd), bandeja con inicio de sesión, chat, historial, ayuda y perfil, instalador de un archivo, 99 playbooks (85 en Linux, 95 en Windows y 81 en macOS) y consola web con casos por nivel (N1 Helpert, N2 en sitio, N3 analista), empresas con fondo de IA, métricas configurables con exportación CSV y administración, sobre PostgreSQL. El agente y la bandeja también compilan y se prueban para Windows y macOS (falta probarlos en un PC y un Mac reales).
 
 Infraestructura: en la nube. El servidor y la consola van en una VPS detrás de Caddy (HTTPS); los datos, en Supabase (PostgreSQL). La IA principal es Gemini (API de Google) y Ollama es el respaldo.
 
@@ -23,7 +23,7 @@ Infraestructura: en la nube. El servidor y la consola van en una VPS detrás de 
 | `web/` | Estilos y scripts de la consola y de la bandeja: Tailwind + componentes de shadcn/ui, DataTables, Choices.js, ECharts, fuente Inter. `npm run build` deja el resultado en `server/helpert_server/estatico/` y `bandeja/ui/` |
 | `playbooks/` | Playbooks: `manifest.toml` + un script por sistema |
 | `eval/` | Casos etiquetados y resultados de la evaluación por modelo |
-| `despliegue/` | Instaladores y empaquetadores del agente (Linux `.run`, Windows `.zip`) e instalación del servidor en la VPS (Caddy, systemd, respaldo) |
+| `despliegue/` | Instaladores y empaquetadores del agente (Linux `.run`, Windows `.zip`, macOS `.zip`) e instalación del servidor en la VPS (Caddy, systemd, respaldo) |
 | `pruebas/` | Playbook inofensivo para las pruebas automáticas |
 
 ## Probar en este equipo
@@ -97,7 +97,22 @@ En el equipo: descomprimir y doble clic en «Instalar Helpert.cmd» (pide permis
 
 Clic en el icono: el panel se despliega en la esquina, como OneDrive; clic derecho: «Abrir Helpert» y «Salir». La bandeja y la guía en pantalla con «Hazlo tú» (SendInput) solo se han comprobado compilando: falta probarlas en un PC real, igual que SmartScreen/Defender con los `.exe` sin firma de código (pedirán confirmación hasta firmarlos con un certificado de editor) y los avisos del sistema (hoy solo cambia el icono).
 
-Playbooks: 99 en total, 90 con script de Windows. Sin script de Windows: `audio.mic`, `audio.output`, `bluetooth.restart`, `net.network-drive` y `net.vpn` (dependen de la sesión de la persona y no se pueden hacer ni comprobar bien desde el servicio), y los propios de Linux (`app.update-apps`, `disk.boot-space`, `files.home-permissions`, `print.supply-levels`); en Windows esos casos van a guía o a un técnico. Hay 56 scripts de macOS, pero todavía no hay agente para macOS: solo se prueban en la CI.
+Playbooks: 99 en total, 95 con script de Windows. Sin script de Windows: los propios de Linux (`app.update-apps`, `disk.boot-space`, `files.home-permissions`) y `print.supply-levels` (Windows no da los niveles de tóner sin el programa de cada fabricante); en Windows esos casos van a guía o a un técnico. Los que actúan en la sesión de la persona (VPN, unidades de red) usan una tarea programada como ella, que se borra al terminar: asoma una ventana un instante.
+
+## Instalar el agente en macOS
+
+macOS 13 o más nuevo, Apple Silicon e Intel (binarios universales). Se compila y se prueba en la CI (trabajo `macos`: pruebas del agente y de la bandeja, `despliegue/armar-macos.sh` arma los binarios y `Helpert.app`, y `despliegue/probar-macos-ci.sh` instala el servicio de verdad con launchd, consulta por el socket y desinstala). El artefacto `helpert-macos` trae los binarios.
+
+```sh
+despliegue/empaquetar-macos.sh --servidor https://helpert.miempresa.pe --clave-publica playbooks.pub \
+    --inscripcion-archivo inscripcion.txt     # → helpert-macos.zip; baja los binarios de la CI de este mismo commit
+```
+
+En el Mac: abrir el .zip y doble clic en «Instalar Helpert.command» (pide la contraseña de administrador; la primera vez macOS puede bloquearlo por no ser de un desarrollador identificado: clic derecho > Abrir). Instala el servicio `pe.helpert.agente` (LaunchDaemon, root; launchd lo vuelve a arrancar si sale), `Helpert.app` en Aplicaciones (solo en la barra de menús, arranca al iniciar sesión) y registra el equipo. Configuración en `/etc/helpert` (solo root), playbooks en `/usr/local/lib/helpert`, registro en `/var/log/helpert-agente.log`. Para quitarlo: «Desinstalar Helpert.command».
+
+Sin probar en un Mac real: la bandeja (icono en la barra de menús y panel), los permisos que macOS pide la primera vez («Grabación de pantalla» para la captura; «Acceso total al disco» para que el servicio lea carpetas protegidas como Documentos o la Papelera, que se da en Ajustes del Sistema o con un perfil MDM) y Gatekeeper con binarios sin firma de Apple (firma ad hoc; para quitar el aviso hace falta una cuenta de desarrollador y notarizarlos). «Hazlo tú» en macOS señala dónde hacer clic pero no lo hace: el clic lo da la persona.
+
+Playbooks en macOS: 81 de 99. Sin script, porque macOS no lo permite o no tiene sentido: los de Windows y Office (activación de Windows, licencia y reparación de Office, caché de Outlook, rutas largas, Winsock, impresora PDF, reparar archivos del sistema), `app.update-apps`, `disk.boot-space`, `disk.optimize` (APFS hace TRIM solo), `domain.refresh-policies` (los perfiles MDM los envía el servidor), `hw.device-errors`, `hw.display-detect`, `hw.privacy-access` (sin MDM no se cambian), `print.scanner`, `system.services-check` (launchd ya reinicia los esenciales) y `system.slow-boot`. `security.quick-scan` en macOS necesita Microsoft Defender (XProtect no tiene un análisis que se pueda lanzar).
 
 ## Playbooks
 

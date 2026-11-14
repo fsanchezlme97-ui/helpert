@@ -1,5 +1,5 @@
 id = "files.restore-trash"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Recuperar un archivo de la papelera"
 descripcion = "La persona borró un archivo o carpeta por error y quiere recuperarlo. Busca en su papelera por una parte del nombre y lo devuelve a la carpeta donde estaba (si ya hay otro con ese nombre, lo deja al lado con otro nombre). El parámetro nombre es una palabra del nombre, sin espacios. No recupera archivos que ya se vaciaron de la papelera ni de memorias USB o carpetas de red."
 riesgo = "bajo"
@@ -9,6 +9,7 @@ timeout = 60
 [sistemas]
 linux = "linux.sh"
 windows = "windows.ps1"
+macos = "macos.sh"
 
 [parametros.nombre]
 tipo = "texto"

@@ -1,5 +1,5 @@
 id = "print.supply-levels"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Ver el nivel de tóner o tinta"
 descripcion = "Saber cuánto tóner o tinta le queda a una impresora. Pregunta los niveles a la impresora, si los informa. Solo revisa: cambiar el tóner lo hace un técnico."
 riesgo = "bajo"

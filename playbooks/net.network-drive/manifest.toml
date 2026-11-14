@@ -1,5 +1,5 @@
 id = "net.network-drive"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Reconectar unidades de red"
 descripcion = "No aparece una carpeta compartida o unidad de red de la oficina (servidor de archivos, Samba o NFS) que el equipo ya tenía configurada. Revisa las unidades de red del equipo y vuelve a montar las que se cayeron. No sirve para pedir acceso a una carpeta nueva ni para permisos: eso lo da soporte."
 riesgo = "bajo"
@@ -8,3 +8,5 @@ timeout = 90
 
 [sistemas]
 linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

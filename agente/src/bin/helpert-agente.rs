@@ -44,8 +44,11 @@ struct Agente {
 
 /// ID de RustDesk o AnyDesk de este equipo, si alguno está instalado (programa con `--get-id`, máximo 5 s).
 fn id_remoto() -> String {
-    #[cfg(unix)]
+    #[cfg(all(unix, not(target_os = "macos")))]
     let programas = [("rustdesk", "rustdesk"), ("anydesk", "anydesk")];
+    #[cfg(target_os = "macos")]
+    let programas = [("rustdesk", "/Applications/RustDesk.app/Contents/MacOS/RustDesk"),
+                     ("anydesk", "/Applications/AnyDesk.app/Contents/MacOS/AnyDesk")];
     #[cfg(windows)]
     let programas = [("rustdesk", r"C:\Program Files\RustDesk\rustdesk.exe"), ("anydesk", r"C:\Program Files (x86)\AnyDesk\AnyDesk.exe")];
     for (prog, ruta) in programas {
@@ -71,7 +74,7 @@ fn id_remoto() -> String {
     String::new()
 }
 
-const SO: &str = std::env::consts::OS; // "linux" (y "windows" cuando se compile allá)
+const SO: &str = std::env::consts::OS; // "linux", "windows" o "macos"
 
 impl Agente {
     fn post(&self, ruta: &str, cuerpo: &Value) -> Result<Value, String> {
@@ -133,7 +136,8 @@ impl Agente {
         }
     }
 
-    /// Reemplaza este ejecutable por una versión firmada y sale con código 75: systemd (Restart=on-failure) o el
+    /// Reemplaza este ejecutable por una versión firmada y sale con código 75: systemd (Restart=on-failure), launchd
+    /// (KeepAlive) o el
     /// administrador de servicios de Windows (acciones de recuperación) lo vuelve a arrancar. Antes prueba el binario nuevo: uno que no arranca nunca reemplaza al que funciona.
     fn actualizar(&self, a: &Value) -> Result<(), String> {
         let campo = |k: &str| a[k].as_str().ok_or(format!("falta {k}"));
@@ -313,19 +317,32 @@ fn salir(codigo: i32) -> ! {
     std::process::exit(codigo)
 }
 
-/// Usuario de quien se conecta, según el núcleo (SO_PEERCRED), no según lo que diga el cliente.
+/// Usuario de quien se conecta, según el núcleo (SO_PEERCRED en Linux, getpeereid en macOS), no según lo que diga
+/// el cliente.
 #[cfg(unix)]
 fn usuario_de(s: &Conexion) -> Option<String> {
     use std::os::unix::io::AsRawFd;
-    let mut cred = libc::ucred { pid: 0, uid: 0, gid: 0 };
-    let mut largo = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
-    let ok = unsafe {
-        libc::getsockopt(s.as_raw_fd(), libc::SOL_SOCKET, libc::SO_PEERCRED, &mut cred as *mut _ as *mut _, &mut largo)
+    #[cfg(not(target_os = "macos"))]
+    let uid = {
+        let mut cred = libc::ucred { pid: 0, uid: 0, gid: 0 };
+        let mut largo = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
+        let ok = unsafe {
+            libc::getsockopt(s.as_raw_fd(), libc::SOL_SOCKET, libc::SO_PEERCRED, &mut cred as *mut _ as *mut _, &mut largo)
+        };
+        if ok != 0 {
+            return None;
+        }
+        cred.uid
     };
-    if ok != 0 {
-        return None;
-    }
-    let out = std::process::Command::new("id").arg("-nu").arg(cred.uid.to_string()).output().ok()?;
+    #[cfg(target_os = "macos")]
+    let uid = {
+        let (mut uid, mut gid) = (0, 0);
+        if unsafe { libc::getpeereid(s.as_raw_fd(), &mut uid, &mut gid) } != 0 {
+            return None;
+        }
+        uid
+    };
+    let out = std::process::Command::new("id").arg("-nu").arg(uid.to_string()).output().ok()?;
     Some(String::from_utf8_lossy(&out.stdout).trim().to_string()).filter(|u| !u.is_empty())
 }
 
@@ -384,7 +401,7 @@ fn conversar(agente: &Agente, con: Conexion) {
     let _ = writeln!(&con, "{resp}");
 }
 
-/// Linux: socket en /run/helpert. Cualquier usuario del equipo puede pedir ayuda; quién es lo dice el núcleo,
+/// Linux y macOS: socket en /run/helpert o /var/run/helpert. Cualquier usuario del equipo puede pedir ayuda; quién es lo dice el núcleo,
 /// y qué se ejecuta lo decide el servidor.
 #[cfg(unix)]
 fn escuchar(ruta: &std::path::Path, atender: impl Fn(Conexion) + Send + Sync + 'static) {

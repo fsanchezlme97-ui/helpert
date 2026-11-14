@@ -1,5 +1,5 @@
 id = "audio.mic"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Recuperar el micrófono"
 descripcion = "No me escuchan en las llamadas o reuniones, el micrófono está silenciado o muy bajo. Quita el silencio del micrófono, sube su volumen al 60 % si estaba bajo y reinicia el servicio de sonido de la sesión si estaba caído. No sirve para un micrófono dañado ni para dar permiso a una página web."
 riesgo = "bajo"
@@ -8,3 +8,5 @@ timeout = 60
 
 [sistemas]
 linux = "linux.sh"
+windows = "windows.ps1"
+macos = "macos.sh"

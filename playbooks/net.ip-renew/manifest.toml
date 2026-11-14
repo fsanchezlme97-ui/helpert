@@ -1,5 +1,5 @@
 id = "net.ip-renew"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Renovar la dirección IP"
 descripcion = "Conectado pero sin acceso, con una IP que empieza por 169.254 o un aviso de conflicto de dirección IP. Pide una dirección nueva al router (DHCP). No sirve si el equipo usa IP fija."
 riesgo = "bajo"

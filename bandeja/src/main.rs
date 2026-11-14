@@ -1,7 +1,7 @@
 //! helpert-bandeja: el icono de Helpert en la bandeja y el panel de chat, como el de OneDrive: un clic en el icono
 //! despliega el panel junto a la barra y se recoge al hacer clic fuera. Corre como el usuario y habla con el servicio
 //! del equipo por el canal local (socket o tubería), igual que el chat de terminal. Lo propio de cada sistema está en
-//! linux.rs y windows.rs.
+//! linux.rs, windows.rs y macos.rs.
 //!
 //! Estados del icono (logo y estados helpert.jpg): disponible, pensando (esperando al servidor o a la IA),
 //! trabajando (el servicio corre un paso de playbook) y aviso (respuesta sin leer o error).
@@ -11,7 +11,8 @@
 #[path = "../../agente/src/canal.rs"]
 mod canal;
 mod guia;
-#[cfg_attr(unix, path = "linux.rs")]
+#[cfg_attr(target_os = "linux", path = "linux.rs")]
+#[cfg_attr(target_os = "macos", path = "macos.rs")]
 #[cfg_attr(windows, path = "windows.rs")]
 mod plataforma;
 
@@ -237,10 +238,10 @@ fn abrir(url: String) -> Result<(), String> {
 
 fn main() {
     // una sola bandeja por sesión: si ya hay una, se le pide que abra su panel y esta termina
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     let Some(unica) = plataforma::unica() else { return };
     let constructor = tauri::Builder::default();
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     let constructor = constructor.plugin(tauri_plugin_single_instance::init(|app, _, _| mostrar(app)));
     constructor
         .manage(Actual(Mutex::new(Estado::Disponible)))
@@ -249,6 +250,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![enviar, consultar, capturar, abrir_remoto, abrir, recoger,
                                                  guia::guia_paso, guia::guia_actuar, guia::guia_cerrar])
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory); // solo en la barra de menús, sin icono en el Dock
             let inicial = if plataforma::servicio_presente() { Estado::Disponible } else { Estado::Aviso };
             plataforma::icono(app, inicial);
             let abrir = std::env::args().any(|a| a == "--abrir");
@@ -256,7 +259,7 @@ fn main() {
                 preparar_panel(&w, abrir);
             }
             *app.state::<Actual>().0.lock().unwrap() = inicial;
-            #[cfg(unix)]
+            #[cfg(target_os = "linux")]
             plataforma::escuchar(unica, app.handle().clone());
             Ok(())
         })

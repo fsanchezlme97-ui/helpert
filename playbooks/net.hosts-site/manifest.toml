@@ -1,5 +1,5 @@
 id = "net.hosts-site"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Desbloquear un sitio en el archivo hosts"
 descripcion = "Un sitio concreto no abre porque el archivo hosts del equipo lo redirige o bloquea. Quita las líneas de ese sitio, con copia para deshacer. El parámetro sitio es el dominio."
 riesgo = "medio"

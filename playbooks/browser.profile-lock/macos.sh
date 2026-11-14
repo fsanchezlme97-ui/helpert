@@ -1,7 +1,9 @@
 #!/bin/bash
 # Desbloquear el perfil del navegador: si Firefox, Chrome, Edge, Brave o Chromium de la persona de verdad están cerrados
-# (ningún proceso suyo de esa app), quita el bloqueo que quedó: «.parentlock» y «lock» de los perfiles de Firefox,
-# «Singleton*» de los de Chrome y parecidos. Nada más del perfil. Con el usuario de la persona (sudo -u). Bash 3.2.
+# (ningún proceso suyo de esa app), quita el bloqueo que quedó: en Firefox, «.parentlock» solo cuando es un enlace (el
+# bloqueo de respaldo que usa en discos de red, y queda si se cierra mal; el archivo normal se bloquea con fcntl, que se
+# suelta solo al cerrarse, así que no cuenta), y «Singleton*» de Chrome y parecidos. Nada más del perfil. Con el usuario
+# de la persona (sudo -u). Bash 3.2.
 set -u
 usuario=${HP_USUARIO:-}
 casa=$([ -n "$usuario" ] && dscl . -read "/Users/$usuario" NFSHomeDirectory 2>/dev/null | sed -n 's/^NFSHomeDirectory: //p')
@@ -24,7 +26,7 @@ base() {
 abierto() { pgrep -u "$usuario" -f "$(patron "$1")" >/dev/null; }
 # bloqueos del navegador $1 (uno por línea); con $2 = -delete, los borra. find no sigue los enlaces: borra el enlace.
 bloqueos() {
-  if [ "$1" = Firefox ]; then como find "$(base "$1")" -mindepth 2 -maxdepth 2 \( -name .parentlock -o -name lock \) ${2:+"$2"} 2>/dev/null
+  if [ "$1" = Firefox ]; then como find "$(base "$1")" -mindepth 2 -maxdepth 2 -name .parentlock -type l ${2:+"$2"} 2>/dev/null
   else como find "$(base "$1")" -mindepth 1 -maxdepth 1 -name 'Singleton*' ${2:+"$2"} 2>/dev/null; fi
 }
 

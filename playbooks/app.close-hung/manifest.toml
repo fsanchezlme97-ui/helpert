@@ -1,5 +1,5 @@
 id = "app.close-hung"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Cerrar un programa congelado"
 descripcion = "Un programa se colgó, no responde o no se puede cerrar. Cierra a la fuerza solo ese programa de la persona, para que pueda abrirlo de nuevo. Se pierde lo que no se guardó en ese programa. El parámetro programa es el nombre del programa en una palabra (por ejemplo firefox, chrome, libreoffice, teams, zoom, thunderbird). No sirve si todo el equipo está congelado ni para programas del sistema."
 riesgo = "medio"
@@ -9,6 +9,7 @@ timeout = 60
 [sistemas]
 linux = "linux.sh"
 windows = "windows.ps1"
+macos = "macos.sh"
 
 [parametros.programa]
 tipo = "texto"

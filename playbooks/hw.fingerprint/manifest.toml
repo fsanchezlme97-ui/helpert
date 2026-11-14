@@ -1,5 +1,5 @@
 id = "hw.fingerprint"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Revisar el lector de huellas"
 descripcion = "El lector de huellas no funciona para iniciar sesión. Revisa si el equipo lo detecta y reinicia su servicio. No registra huellas nuevas."
 riesgo = "bajo"
@@ -9,3 +9,4 @@ timeout = 60
 [sistemas]
 linux = "linux.sh"
 windows = "windows.ps1"
+macos = "macos.sh"

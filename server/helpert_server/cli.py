@@ -61,8 +61,8 @@ def revisar(cfg: dict) -> list[tuple[str, str]]:
             r.append(("falta", f"Playbooks sin firma válida para esta clave pública: {', '.join(malos)}"))
         else:
             todos = cat.cargar(cfg["playbooks"]).values()
-            win = sum("windows" in pb.sistemas for pb in todos)
-            r.append(("bien", f"Playbooks: {len(paquetes)} firmados ({win} con Windows)"))
+            win, mac = (sum(so in pb.sistemas for pb in todos) for so in ("windows", "macos"))
+            r.append(("bien", f"Playbooks: {len(paquetes)} firmados ({win} con Windows, {mac} con macOS)"))
     aj["ia"] = [p for p in aj["ia"] if p.get("activo", True)]
     externos = [p for p in aj["ia"] if not p.get("local")]
     sin_clave = [p["proveedor"] for p in externos if p["proveedor"] != "ollama" and not p.get("clave_cifrada")
@@ -161,12 +161,12 @@ def main(argv=None):
     s = sub.add_parser("firmar-agente", help="Firma un binario del agente (fuera del servidor, con la clave privada)")
     s.add_argument("binario")
     s.add_argument("--version", required=True)
-    s.add_argument("--so", default="linux", choices=("linux", "windows"))
+    s.add_argument("--so", default="linux", choices=("linux", "windows", "macos"))
     s.add_argument("--clave", required=True)
     s = sub.add_parser("publicar-agente", help="Sube un binario firmado del agente; se despliega desde la consola")
     s.add_argument("binario")
     s.add_argument("--version", required=True)
-    s.add_argument("--so", default="linux", choices=("linux", "windows"))
+    s.add_argument("--so", default="linux", choices=("linux", "windows", "macos"))
     s.add_argument("--firma", required=True, help="Archivo .firma que dejó firmar-agente")
     sub.add_parser("revisar", help="Comprueba la configuración antes de abrir el servidor a los equipos")
     sub.add_parser("purgar", help="Borra las capturas vencidas (también lo hace el servidor cada hora)")

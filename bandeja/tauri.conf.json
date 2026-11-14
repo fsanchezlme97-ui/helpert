@@ -6,6 +6,7 @@
   "build": { "frontendDist": "ui" },
   "app": {
     "withGlobalTauri": true,
+    "macOSPrivateApi": true,
     "windows": [
       { "label": "chat", "title": "Helpert · soporte TI", "width": 400, "height": 620, "visible": false,
         "decorations": false, "transparent": true, "shadow": false, "resizable": false, "skipTaskbar": true, "alwaysOnTop": true }

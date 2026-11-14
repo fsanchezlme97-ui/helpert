@@ -1,7 +1,7 @@
 id = "files.icon-cache"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Reparar iconos y miniaturas"
-descripcion = "Los iconos se ven en blanco o las miniaturas de fotos y documentos no aparecen o son viejas. Borra la caché de iconos y miniaturas de la persona; se rehace sola."
+descripcion = "Los iconos se ven en blanco o las miniaturas de fotos y documentos no aparecen o son viejas. Borra la caché de iconos y miniaturas de la persona; se rehace sola. En Windows cierra un momento el Explorador de archivos (se cierran las ventanas de carpetas)."
 riesgo = "bajo"
 deshacer = false
 timeout = 120

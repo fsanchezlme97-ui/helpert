@@ -1,5 +1,5 @@
 id = "security.threats"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Ver qué detectó el antivirus"
 descripcion = "El antivirus avisó de una amenaza o se llevó un archivo. Lista las detecciones recientes y qué hizo con cada una. Solo revisa: sacar un archivo de cuarentena lo decide soporte."
 riesgo = "bajo"
@@ -9,3 +9,4 @@ timeout = 60
 [sistemas]
 linux = "linux.sh"
 windows = "windows.ps1"
+macos = "macos.sh"

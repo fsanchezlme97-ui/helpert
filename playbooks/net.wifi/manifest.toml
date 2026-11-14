@@ -1,5 +1,5 @@
 id = "net.wifi"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Reconectar el Wi-Fi"
 descripcion = "El Wi-Fi está apagado, en modo avión o no se conecta solo a una red que el equipo ya conocía. Quita el bloqueo de radio, enciende el Wi-Fi y lo conecta a una red guardada. No sirve para una red nueva que pide contraseña ni si el equipo tiene cable y lo que falla es internet (eso es «Sin internet o Wi-Fi»)."
 riesgo = "bajo"
@@ -9,3 +9,4 @@ timeout = 60
 [sistemas]
 linux = "linux.sh"
 windows = "windows.ps1"
+macos = "macos.sh"

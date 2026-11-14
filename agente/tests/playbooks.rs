@@ -104,7 +104,7 @@ fn valida_parametros_como_el_servidor() {
 
 #[test]
 fn corta_por_tiempo_y_mata_a_los_hijos() {
-    let m: Manifiesto = toml::from_str("id='x'\nversion='1'\nnombre='x'\ntimeout=1\n[sistemas]\nlinux='l.sh'\nwindows='w.ps1'").unwrap();
+    let m: Manifiesto = toml::from_str("id='x'\nversion='1'\nnombre='x'\ntimeout=1\n[sistemas]\nlinux='l.sh'\nwindows='w.ps1'\nmacos='l.sh'").unwrap();
     let archivos = [("l.sh".to_string(), b"sleep 30 & sleep 30".to_vec()),
                     ("w.ps1".to_string(), b"Start-Process -NoNewWindow ping -ArgumentList '-n','30','127.0.0.1'; Start-Sleep 30".to_vec())]
         .into_iter().collect();

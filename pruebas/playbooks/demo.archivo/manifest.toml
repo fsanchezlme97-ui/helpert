@@ -10,6 +10,7 @@ timeout = 10
 [sistemas]
 linux = "linux.sh"
 windows = "windows.ps1"
+macos = "linux.sh"
 
 [parametros.nombre]
 tipo = "texto"

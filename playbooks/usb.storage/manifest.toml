@@ -1,5 +1,5 @@
 id = "usb.storage"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Abrir una memoria USB o disco externo"
 descripcion = "La memoria USB, disco externo o tarjeta de memoria no aparece o no se abre. Revisa si el equipo la detecta y, si está conectada pero sin abrir, la monta para la persona. No recupera archivos de una memoria dañada ni la formatea."
 riesgo = "bajo"
@@ -9,3 +9,4 @@ timeout = 60
 [sistemas]
 linux = "linux.sh"
 windows = "windows.ps1"
+macos = "macos.sh"

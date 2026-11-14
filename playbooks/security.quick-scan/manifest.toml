@@ -1,5 +1,5 @@
 id = "security.quick-scan"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Analizar el equipo con el antivirus"
 descripcion = "La persona sospecha de un virus, ventanas raras o un archivo dudoso. Hace un análisis rápido con el antivirus del equipo y dice qué encontró. Lo que el antivirus aísle queda en cuarentena: devolverlo lo decide soporte."
 riesgo = "bajo"
@@ -9,3 +9,4 @@ timeout = 1800
 [sistemas]
 linux = "linux.sh"
 windows = "windows.ps1"
+macos = "macos.sh"

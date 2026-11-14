@@ -1,5 +1,5 @@
 id = "files.home-permissions"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Reparar los permisos de la carpeta personal"
 descripcion = "La persona no puede guardar, renombrar o borrar sus propios archivos («permiso denegado»). Le devuelve la propiedad de los archivos de su carpeta personal que quedaron a nombre de otra cuenta."
 riesgo = "medio"

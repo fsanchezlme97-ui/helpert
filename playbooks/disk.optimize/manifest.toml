@@ -1,5 +1,5 @@
 id = "disk.optimize"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Optimizar el disco"
 descripcion = "El disco va lento. Ejecuta la optimización del sistema: TRIM en discos SSD o desfragmentación en discos mecánicos."
 riesgo = "bajo"

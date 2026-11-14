@@ -1,5 +1,5 @@
 id = "files.in-use"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Ver qué programa usa un archivo"
 descripcion = "No se puede borrar, mover o abrir un archivo porque «está en uso». Busca qué programa de la persona lo tiene abierto y lo cierra. El parámetro archivo es una palabra de su nombre."
 riesgo = "medio"

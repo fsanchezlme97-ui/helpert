@@ -1,7 +1,7 @@
 id = "usb.devices"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Revisar los dispositivos USB"
-descripcion = "Un mouse, teclado, lector, base o adaptador USB no funciona. Lista lo que el equipo detecta por USB y reinicia la detección. Para memorias es «Abrir una memoria USB»."
+descripcion = "Un mouse, teclado, lector, base o adaptador USB no funciona. Lista lo que el equipo detecta por USB y, en Windows y Linux, reinicia la detección. Para memorias es «Abrir una memoria USB»."
 riesgo = "bajo"
 deshacer = false
 timeout = 60
@@ -9,3 +9,4 @@ timeout = 60
 [sistemas]
 linux = "linux.sh"
 windows = "windows.ps1"
+macos = "macos.sh"

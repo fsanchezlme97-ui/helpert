@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- /Library/LaunchDaemons/pe.helpert.agente.plist · agente en cada Mac (lo instala despliegue/instalar-agente-macos.sh).
+     Corre como root. KeepAlive: launchd lo vuelve a arrancar si sale (también tras una actualización, código 75). -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>pe.helpert.agente</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/helpert-agente</string>
+    <string>/etc/helpert/agente.toml</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+  <key>StandardOutPath</key>
+  <string>/var/log/helpert-agente.log</string>
+  <key>StandardErrorPath</key>
+  <string>/var/log/helpert-agente.log</string>
+</dict>
+</plist>

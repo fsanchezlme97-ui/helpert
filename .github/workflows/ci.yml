@@ -1,4 +1,4 @@
-# Pruebas en Linux y Windows, y los binarios de Windows listos para empaquetar (despliegue/empaquetar-windows.sh).
+# Pruebas en Linux, macOS y Windows, y los binarios de Windows y macOS listos para empaquetar (despliegue/empaquetar-*.sh).
 # Aquí nunca hay claves: los playbooks y las versiones del agente se firman fuera, donde está la clave privada.
 name: ci
 on:
@@ -35,13 +35,20 @@ jobs:
           done
           [ "$(stat -c %U /etc/hosts)" = root ]
 
-  macos:  # no hay agente para macOS todavía: aquí solo se prueban los scripts macos.sh (bash 3.2, herramientas BSD)
+  macos:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+      - run: cd agente && cargo test -q
+      - run: cd bandeja && cargo test -q
+      - name: Binarios universales (Apple Silicon e Intel) y Helpert.app
+        run: despliegue/armar-macos.sh dist-macos
+      - name: Servicio (launchd), socket y servidor de punta a punta, con el instalador de verdad
+        run: despliegue/probar-macos-ci.sh dist-macos
       - name: Archivos de root en la carpeta personal, para que files.home-permissions aplique de verdad
         run: |
           sudo mkdir -p ~/helpert-prueba/sub && sudo touch ~/helpert-prueba/sub/b ~/helpert-prueba/-raro ~/helpert-raro
@@ -54,6 +61,10 @@ jobs:
             [ "$(stat -f %Su "$f")" = "$USER" ] || { echo "sigue sin ser de $USER: $f"; exit 1; }
           done
           [ "$(stat -f %Su /etc/hosts)" = root ]
+      - uses: actions/upload-artifact@v4
+        with:
+          name: helpert-macos
+          path: dist-macos
 
   windows:
     runs-on: windows-latest

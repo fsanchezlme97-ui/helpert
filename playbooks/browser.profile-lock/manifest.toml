@@ -1,5 +1,5 @@
 id = "browser.profile-lock"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Desbloquear el perfil del navegador"
 descripcion = "Firefox o Chrome dicen que ya están abiertos o que el perfil está en uso, pero no se ven. Si el navegador de verdad está cerrado, quita el bloqueo que quedó."
 riesgo = "bajo"

@@ -1,5 +1,5 @@
 id = "app.libreoffice-reset"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Restablecer LibreOffice"
 descripcion = "LibreOffice no abre, se cierra solo al abrir o se ve mal. Renombra el perfil de LibreOffice de la persona para empezar con uno nuevo. Se puede deshacer. No es para cuando LibreOffice está abierto pero colgado o no responde: eso es cerrar el programa."
 riesgo = "bajo"

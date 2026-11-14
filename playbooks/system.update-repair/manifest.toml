@@ -1,7 +1,7 @@
 id = "system.update-repair"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Reparar las actualizaciones del sistema"
-descripcion = "Las actualizaciones fallan siempre con un error. Repara el gestor de actualizaciones (componentes de Windows Update o paquetes a medio instalar en Linux) sin instalar nada nuevo."
+descripcion = "Las actualizaciones fallan siempre con un error. Repara el gestor de actualizaciones (componentes de Windows Update, paquetes a medio instalar en Linux, o el servidor y el servicio de Actualización de software en macOS) sin instalar nada nuevo."
 riesgo = "medio"
 deshacer = false
 timeout = 1200
@@ -9,3 +9,4 @@ timeout = 1200
 [sistemas]
 linux = "linux.sh"
 windows = "windows.ps1"
+macos = "macos.sh"

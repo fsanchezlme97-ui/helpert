@@ -1,5 +1,5 @@
 id = "print.set-default"
-version = "0.1.0"
+version = "0.1.1"
 nombre = "Elegir la impresora predeterminada"
 descripcion = "Los documentos salen por otra impresora o la persona quiere que una impresora ya instalada sea la que se use siempre. Deja esa impresora como predeterminada del equipo. El parámetro impresora es su nombre en una palabra. No instala impresoras nuevas."
 riesgo = "bajo"
@@ -9,6 +9,7 @@ timeout = 30
 [sistemas]
 linux = "linux.sh"
 windows = "windows.ps1"
+macos = "macos.sh"
 
 [parametros.impresora]
 tipo = "texto"

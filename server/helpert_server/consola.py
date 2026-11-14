@@ -1422,6 +1422,7 @@ def montar(app: FastAPI, cfg: dict) -> None:
                  AND (visto IS NULL OR visto <= now() - %(s)s)) AS sin_senal,
               (SELECT count(*) FROM equipos WHERE empresa_id = %(e)s AND revocado IS NULL AND lower(so) = 'linux') AS linux,
               (SELECT count(*) FROM equipos WHERE empresa_id = %(e)s AND revocado IS NULL AND lower(so) = 'windows') AS windows,
+              (SELECT count(*) FROM equipos WHERE empresa_id = %(e)s AND revocado IS NULL AND lower(so) = 'macos') AS macos,
               (SELECT count(*) FROM usuarios_consola WHERE empresa_id = %(e)s AND activo) AS cuentas,
               count(*) FILTER (WHERE k.estado = 'escalado') AS escalados,
               count(*) FILTER (WHERE k.estado = 'escalado' AND coalesce(k.escalado, k.creado) + make_interval(mins =>
@@ -2385,7 +2386,7 @@ def montar(app: FastAPI, cfg: dict) -> None:
             recargas = c.execute("SELECT * FROM recargas WHERE empresa_id = %s ORDER BY id DESC LIMIT 50", (eid,)).fetchall()
             r = resumen_empresa(c, eid)
         accion = lambda a: f"/consola/admin/empresas/{eid}/{a}"
-        sistemas = " · ".join(f"{n} {s}" for s, n in (("Linux", r["linux"]), ("Windows", r["windows"])) if n)
+        sistemas = " · ".join(f"{n} {s}" for s, n in (("Linux", r["linux"]), ("Windows", r["windows"]), ("macOS", r["macos"])) if n)
         cifras = ('<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">'
                   + cifra("Equipos en línea", f'{r["en_linea"]} / {f["equipos"]}',
                           (f'{r["sin_senal"]} sin señal' if r["sin_senal"] else "Ninguno sin señal") + (f" · {sistemas}" if sistemas else ""),
