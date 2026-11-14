@@ -116,7 +116,7 @@ def icono(nombre: str, clase: str = "size-4") -> str:
 
 
 def logo(clase: str = "size-8", alt: str = "") -> str:
-    """Logo: la cabeza de la mascota (se lee igual en los dos temas)."""
+    """Logo: la marca «H>_» sobre un cuadro blanco (se lee igual en los dos temas)."""
     return f'<img src="{E}/icono.png" alt="{alt}" class="shrink-0 {clase}">'
 
 

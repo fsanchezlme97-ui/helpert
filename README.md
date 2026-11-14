@@ -1,4 +1,9 @@
-<p align="center"><img src="bandeja/iconos/mascota-original.png" alt="Helpert, asistente de soporte TI con IA" width="720"></p>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="bandeja/iconos/logo-oscuro.png">
+    <img src="bandeja/iconos/logo.png" alt="Helpert, asistente de soporte TI con IA" width="480">
+  </picture>
+</p>
 
 # Helpert
 
@@ -14,7 +19,7 @@ Infraestructura: en la nube. El servidor y la consola van en una VPS detrás de 
 | --- | --- |
 | `server/` | API para los agentes, consola web, capa de IA con respaldo, catálogo, firma de playbooks y evaluación |
 | `agente/` | `helpert-agente` (servicio del equipo, Rust) y `helpert` (chat de terminal) |
-| `bandeja/` | `helpert-bandeja` (Tauri): icono con los estados del logo y ventana de chat; `iconos/generar.py` dibuja los iconos |
+| `bandeja/` | `helpert-bandeja` (Tauri): icono con los estados del logo y ventana de chat; `iconos/generar.py` dibuja el logo y los iconos |
 | `web/` | Estilos y scripts de la consola y de la bandeja: Tailwind + componentes de shadcn/ui, DataTables, Choices.js, ECharts, fuente Inter. `npm run build` deja el resultado en `server/helpert_server/estatico/` y `bandeja/ui/` |
 | `playbooks/` | Playbooks: `manifest.toml` + un script por sistema |
 | `eval/` | Casos etiquetados y resultados de la evaluación por modelo |
@@ -50,6 +55,8 @@ El agente corre sin privilegios en desarrollo: los diagnósticos funcionan, y lo
 DEV=.dev-pruebas PLAYBOOKS=pruebas/playbooks PUERTO=8766 ./dev.sh
 HELPERT_SOCKET=.dev-pruebas/agente.sock agente/target/debug/helpert   # «crea un archivo de prueba llamado x1»
 ```
+
+Gemini: crea una clave en Google AI Studio y ponla en Administración → IA (proveedor `gemini`). La capa gratuita alcanza para probar, con límites: unas 20 peticiones al día por modelo en `gemini-3.5-flash` (más en `gemini-3.5-flash-lite`), y Google puede usar esos datos para entrenar, así que solo datos de prueba. En producción, una clave de pago.
 
 Medir un modelo con los casos etiquetados (`eval/casos.jsonl`: catálogo, guías, saludos, escalar, lo que no se guía, ataques y conversaciones de varios turnos; cada caso dice qué debe recibir la persona):
 
@@ -107,6 +114,7 @@ Iconos de la bandeja: verde, disponible; azul, pensando (esperando al servidor o
 - La consola escapa todo dato que no escribimos (usuario, IA, scripts) y usa CSP estricta: solo scripts propios servidos por el mismo servidor, y todo funciona sin JavaScript. Los formularios de administración llevan token CSRF y cada cambio queda en `auditoria`. Los ajustes se guardan en la tabla `ajustes` (el TOML solo da los valores iniciales) y la API los lee en cada petición, así que pausar los agentes, apagar la IA o desactivar un playbook actúa en segundos. Las claves de API se guardan cifradas (Fernet, con `HELPERT_CLAVE_MAESTRA`), nunca se muestran ni entran en la auditoría; también pueden ir en variables `HELPERT_IA_*`.
 - Reglas por área (Administración → Privacidad): un área «solo IA local» nunca usa un proveedor externo; si no hay uno local activo, recibe el menú sin IA. También bloquean playbooks y capturas por área.
 - Capturas: apagadas por defecto. Con ellas activas, Helpert pide permiso, la persona ve la captura antes de enviarla y se registra el sí o el no. Solo las ven Administración, el Analista N2 y el técnico asignado, y cada vista queda en la auditoría. Falta el ocultamiento automático de datos sensibles que pide el plan.
+- Guía en pantalla: después de una guía escrita, si el área permite capturas, la bandeja ofrece «Guíame en pantalla». Helpert toma la pantalla, el modelo de visión lista sus elementos con su caja (análisis de pantalla), el servidor les dibuja números (Set-of-Mark) y el modelo elige un número y una acción de una lista cerrada (clic, doble clic, desplazar). La bandeja resalta ese elemento y lleva un cursor fantasma hasta él, en una capa transparente que deja pasar los clics. La persona hace el paso, o pulsa «Hazlo tú» y Helpert hace solo ese clic (Hyprland: `ydotool`; X11: `xdotool`); nunca escribe texto. La imagen no se guarda, solo el texto de cada paso. Un paso que pide contraseñas, códigos o comandos se escala, y cada caso tiene un tope de 12 pasos y 24 intentos.
 - Empresas: cada consulta de la consola filtra por la empresa de la cuenta; un id de otra empresa da 404. La API solo atiende a una persona con sesión en ese equipo. Con el fondo activo y sin saldo (o con la persona en su tope del mes), no se llama a ninguna IA externa: atiende el modelo local, luego el menú y luego se escala.
 - La bandeja solo abre `mailto:` y `https://wa.me/<dígitos>`, y solo ejecuta `rustdesk` o `anydesk`; nada de lo que llega del servidor se ejecuta tal cual.
 - Atajos marcados con `shortcut:` en el código: clave de inscripción compartida en el instalador, login propio en lugar de Supabase Auth, token sin TLS mutuo y una conexión a la base por petición.
