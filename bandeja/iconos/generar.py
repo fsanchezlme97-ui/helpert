@@ -6,7 +6,9 @@
   avatar del chat). Con el trazo original, a ese tamaño el contorno de la H se pierde.
 - {estado}-{tema}.png: iconos de la bandeja (app indicator), la marca chica del tema del panel con un punto del color del
   estado arriba a la derecha, donde no tapa nada. El borde del punto es del color del panel.
-- icono.png: la marca chica sobre un cuadro blanco redondeado (favicon, menú de aplicaciones).
+- icono.png: la marca chica sobre un cuadro blanco redondeado (favicon).
+- app/helpert-{n}.png: ese mismo icono dibujado en cada tamaño del tema (16 a 256 px), el que usan el menú de
+  aplicaciones y las barras de tareas. Reducir el de 256 a 16 lo dejaba borroso.
 - logo.png / logo-oscuro.png: el logo con texto, para el README.
 
 Colores de estado de la paleta Oxocarbon (los mismos de la interfaz). Requiere ImageMagick 7 (`magick`).
@@ -31,7 +33,8 @@ COPIAS = ("icono.png", "marca.png", "marca-oscuro.png", "marca-chica.png", "marc
 
 def magick(*args) -> None:
     *resto, salida = map(str, args)  # PNG32: RGBA siempre, sin paleta (algunos visores tratan mal el alfa de 1 bit)
-    subprocess.run(["magick", *resto, f"PNG32:{salida}"], check=True)
+    # sin fecha en el PNG: regenerar no cambia los archivos si el dibujo es el mismo
+    subprocess.run(["magick", *resto, "-define", "png:exclude-chunks=date,time", f"PNG32:{salida}"], check=True)
 
 
 def capa(mascara: list, color: str, ancho: int, alto: int) -> list:
@@ -59,6 +62,12 @@ if __name__ == "__main__":
                    "-fill", color, "-draw", "circle 53,11 53,3", AQUI / f"{estado}-{tema}.png")
     magick("-size", "256x256", "xc:none", "-fill", "#FFFFFF", "-draw", "roundrectangle 0,0 255,255 56,56",
            "(", AQUI / "marca-chica.png", "-resize", "196x196", ")", "-gravity", "center", "-composite", AQUI / "icono.png")
+    (AQUI / "app").mkdir(exist_ok=True)
+    for n in (16, 22, 24, 32, 48, 64, 128, 256):  # en lo chico, menos margen: la marca ocupa más del cuadro
+        lado, radio = round(n * (0.86 if n < 32 else 0.76)), round(n * 0.22)
+        magick("-size", f"{n}x{n}", "xc:none", "-fill", "#FFFFFF", "-draw", f"roundrectangle 0,0 {n - 1},{n - 1} {radio},{radio}",
+               "(", AQUI / "marca-chica.png", "-resize", f"{lado}x{lado}", ")", "-gravity", "center", "-composite",
+               AQUI / "app" / f"helpert-{n}.png")
     magick(AQUI / "logo-texto-original.png", "-trim", "+repage", AQUI / "logo.png")
     magick(AQUI / "logo.png", *OSCURECER, AQUI / "logo-oscuro.png")
     for destino in (RAIZ / "bandeja" / "ui", RAIZ / "server" / "helpert_server" / "estatico"):

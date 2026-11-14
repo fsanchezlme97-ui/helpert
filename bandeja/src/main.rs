@@ -232,6 +232,21 @@ fn ya_abierta() -> Option<std::os::unix::net::UnixListener> {
     std::os::unix::net::UnixListener::bind(&ruta).ok()
 }
 
+/// Carpeta de los PNG del icono de la bandeja, nueva en cada ejecución (~/.cache/helpert/bandeja/<pid>). El app indicator
+/// los pasa por ruta: con la ruta de siempre (/run/user/N/tray-icon/tray-icon-helpert-0.png), una barra que guarda las
+/// imágenes por ruta mostraba el icono de una versión anterior; y algunas barras cambian los de /run y /tmp por el del tema.
+fn carpeta_iconos() -> Option<std::path::PathBuf> {
+    let cache = std::env::var_os("XDG_CACHE_HOME").map(std::path::PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".cache")))?;
+    let base = cache.join("helpert").join("bandeja");
+    if let Ok(viejas) = std::fs::read_dir(&base) {
+        for d in viejas.flatten() {
+            let _ = std::fs::remove_dir_all(d.path()); // de ejecuciones anteriores: solo corre una bandeja por sesión
+        }
+    }
+    Some(base.join(std::process::id().to_string()))
+}
+
 fn main() {
     let Some(unica) = ya_abierta() else { return };
     tauri::Builder::default()
@@ -246,8 +261,11 @@ fn main() {
                 &MenuItem::with_id(app, "salir", "Salir", true, None::<&str>)?,
             ])?;
             let inicial = if std::path::Path::new(&socket()).exists() { Estado::Disponible } else { Estado::Aviso };
-            TrayIconBuilder::with_id("helpert")
-                .icon(Image::from_bytes(png(inicial, oscuro()))?)
+            let mut tray = TrayIconBuilder::with_id("helpert");
+            if let Some(dir) = carpeta_iconos() {
+                tray = tray.temp_dir_path(dir);
+            }
+            tray.icon(Image::from_bytes(png(inicial, oscuro()))?)
                 .tooltip("Helpert · soporte TI")
                 .menu(&menu)
                 .on_menu_event(|app, ev| match ev.id.as_ref() {

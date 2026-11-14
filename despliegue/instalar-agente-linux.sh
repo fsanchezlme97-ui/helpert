@@ -10,13 +10,13 @@ RAIZ=$(cd "$(dirname "$0")/.." && pwd)
 UNIDAD=$(dirname "$0")/helpert-agente.service
 BIN=$RAIZ/agente/target/release
 BANDEJA=$RAIZ/bandeja/target/release/helpert-bandeja
-ICONO=$RAIZ/bandeja/iconos/icono.png
+ICONOS=$RAIZ/bandeja/iconos/app  # helpert-{tamaño}.png
 PB=$RAIZ/playbooks
 uso() { sed -n '3,6p' "$0"; exit 2; }
 while [ $# -gt 0 ]; do
   case $1 in
     --paquete) P=$2; SERVIDOR=$(cat "$P/servidor.txt"); PUB=$P/playbooks.pub; INSCRIPCION_F=$P/inscripcion
-               PB=$P/playbooks; BIN=$P/bin; BANDEJA=$P/bin/helpert-bandeja; ICONO=$P/helpert.png; UNIDAD=$P/helpert-agente.service; shift 2 ;;
+               PB=$P/playbooks; BIN=$P/bin; BANDEJA=$P/bin/helpert-bandeja; ICONOS=$P/iconos; UNIDAD=$P/helpert-agente.service; shift 2 ;;
     --servidor) SERVIDOR=$2; shift 2 ;;
     --token-archivo) TOKEN_F=$2; shift 2 ;;
     --inscripcion-archivo) INSCRIPCION_F=$2; shift 2 ;;
@@ -30,7 +30,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ "$(id -u)" -eq 0 ] || { echo "Ejecútalo con sudo."; exit 1; }
-BANDEJA_ARCHIVOS="/usr/local/bin/helpert-bandeja /etc/xdg/autostart/helpert-bandeja.desktop /usr/share/applications/helpert.desktop /usr/share/icons/hicolor/256x256/apps/helpert.png /usr/share/icons/hicolor/scalable/apps/helpert.svg"  # el .svg: icono de versiones anteriores
+BANDEJA_ARCHIVOS="/usr/local/bin/helpert-bandeja /etc/xdg/autostart/helpert-bandeja.desktop /usr/share/applications/helpert.desktop /usr/share/icons/hicolor/*/apps/helpert.png /usr/share/icons/hicolor/scalable/apps/helpert.svg"  # el .svg: icono de versiones anteriores
 
 if [ "${DESINSTALAR:-}" ]; then
   systemctl disable --now helpert-agente 2>/dev/null || true
@@ -43,7 +43,7 @@ if [ "${DESINSTALAR:-}" ]; then
 fi
 
 [ -n "${SERVIDOR:-}" ] && [ -n "${PUB:-}" ] || uso
-for f in "$BIN/helpert-agente" "$BIN/helpert" "$PUB" "$UNIDAD" ${BANDEJA:+"$BANDEJA" "$ICONO"}; do
+for f in "$BIN/helpert-agente" "$BIN/helpert" "$PUB" "$UNIDAD" ${BANDEJA:+"$BANDEJA" "$ICONOS/helpert-256.png"}; do
   [ -f "$f" ] || { echo "Falta $f"; exit 1; }
 done
 ls "$PB"/*/firma.ed25519 >/dev/null 2>&1 || { echo "Los playbooks de $PB no están firmados."; exit 1; }
@@ -99,14 +99,17 @@ systemctl restart helpert-agente
 if [ -n "$BANDEJA" ]; then
   pkill -x helpert-bandeja 2>/dev/null || true  # la versión anterior; el instalador abre la nueva como el usuario
   install -Dm755 "$BANDEJA" /usr/local/bin/helpert-bandeja
-  install -Dm644 "$ICONO" /usr/share/icons/hicolor/256x256/apps/helpert.png
+  for f in "$ICONOS"/helpert-*.png; do  # un archivo por tamaño del tema: reducido desde 256 se veía borroso
+    n=${f##*-}; n=${n%.png}; install -Dm644 "$f" "/usr/share/icons/hicolor/${n}x${n}/apps/helpert.png"
+  done
   rm -f /usr/share/icons/hicolor/scalable/apps/helpert.svg  # icono de versiones anteriores: el tema lo prefería al PNG
   ENTRADA='[Desktop Entry]
 Type=Application
 Name=Helpert
 Comment=Soporte TI: cuéntale qué le pasa a tu equipo
 Icon=helpert
-Categories=Utility;'
+Categories=Utility;
+StartupWMClass=helpert-bandeja'  # la clase de la ventana: así la barra de tareas usa este icono
   printf '%s\nExec=/usr/local/bin/helpert-bandeja --abrir\n' "$ENTRADA" > /usr/share/applications/helpert.desktop
   printf '%s\nExec=/usr/local/bin/helpert-bandeja\nNoDisplay=true\nX-GNOME-Autostart-enabled=true\n' "$ENTRADA" > /etc/xdg/autostart/helpert-bandeja.desktop
   chmod 644 /usr/share/applications/helpert.desktop /etc/xdg/autostart/helpert-bandeja.desktop
