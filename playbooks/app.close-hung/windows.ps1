@@ -31,10 +31,11 @@ function NoPuedo {
 }
 # procesos de la persona cuyo nombre contiene el programa (sin distinguir mayúsculas)
 function Procesos {
+  if (-not $sid -or $prog.Length -lt 3 -or $prog -match $PROTEGIDOS) { return @() }  # sin persona o programa claro, nada
   @(Get-CimInstance Win32_Process | Where-Object {
       $n = "$($_.Name)".ToLower() -replace '\.exe$', ''
       $n.Contains($prog) -and $n -notmatch $PROTEGIDOS
-    } | Where-Object { (Invoke-CimMethod -InputObject $_ -MethodName GetOwnerSid -ErrorAction SilentlyContinue).Sid -eq $sid })
+    } | Where-Object { $o = (Invoke-CimMethod -InputObject $_ -MethodName GetOwnerSid -ErrorAction SilentlyContinue).Sid; $o -and $o -eq $sid })
 }
 
 try {
@@ -55,6 +56,7 @@ try {
       exit 0
     }
     'aplicar' {
+      $m = NoPuedo; if ($m) { $m; exit 3 }
       $p = @(Procesos)
       if ($p.Count -eq 0) { 'El programa ya estaba cerrado.'; exit 0 }
       foreach ($x in $p) { Stop-Process -Id $x.ProcessId -Force -ErrorAction SilentlyContinue }

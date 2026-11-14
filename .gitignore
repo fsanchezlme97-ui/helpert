@@ -13,3 +13,4 @@ bandeja/target/
 *.run
 .playwright-mcp/
 web/node_modules/
+.claude/
