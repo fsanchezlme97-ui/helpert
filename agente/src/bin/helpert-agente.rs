@@ -565,10 +565,11 @@ mod servicio {
     }
 
     /// ProgramData\Helpert guarda la configuración con el token, el registro y la carpeta temporal de los scripts.
-    /// ProgramData deja a cualquier usuario crear carpetas, así que en cada arranque el servicio (SYSTEM) se la apropia
-    /// con permisos propios, sin herencia: solo SYSTEM y Administradores. Si es un enlace, no arranca. Lo que alguien
-    /// pudiera haber dejado dentro antes (un enlace con el nombre de la carpeta temporal o del registro) no se abre:
-    /// tmp se borra y se crea de nuevo, y el registro anterior se renombra antes de crear uno nuevo.
+    /// ProgramData deja a cualquier usuario crear carpetas: si la carpeta es un enlace o no es de SYSTEM ni de
+    /// Administradores (alguien la creó antes de instalar), el servicio no arranca; el instalador la borra y la crea de
+    /// nuevo. Si es de ellos, en cada arranque se le restablecen los permisos a ella y a todo lo que tiene dentro (sin
+    /// herencia de ProgramData: solo SYSTEM y Administradores), tmp se crea de nuevo y el registro anterior se renombra
+    /// antes de crear uno nuevo.
     fn proteger_carpeta() -> Result<(), String> {
         use std::os::windows::fs::MetadataExt;
         use windows_sys::Win32::Foundation::{LocalFree, ERROR_SUCCESS};
@@ -581,6 +582,20 @@ mod servicio {
             return Err(format!("{} es un enlace o no es una carpeta; reinstala Helpert", dir.display()));
         }
         let ancho = |t: &str| t.encode_utf16().chain([0]).collect::<Vec<u16>>();
+        let ruta: Vec<u16> = std::os::windows::ffi::OsStrExt::encode_wide(dir.as_os_str()).chain([0]).collect();
+        let (mut actual, mut sd_actual) = (std::ptr::null_mut(), std::ptr::null_mut());
+        let r = unsafe {
+            GetNamedSecurityInfoW(ruta.as_ptr(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &mut actual,
+                                  std::ptr::null_mut(), std::ptr::null_mut(), std::ptr::null_mut(), &mut sd_actual)
+        };
+        let de_admin = r == ERROR_SUCCESS
+            && unsafe { IsWellKnownSid(actual, WinLocalSystemSid) != 0 || IsWellKnownSid(actual, WinBuiltinAdministratorsSid) != 0 };
+        if !sd_actual.is_null() {
+            unsafe { LocalFree(sd_actual as _) };
+        }
+        if !de_admin {
+            return Err(format!("{} no es de SYSTEM ni de Administradores; reinstala Helpert", dir.display()));
+        }
         let mut sd = std::ptr::null_mut();
         let sddl = ancho("O:SYD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)");
         if unsafe { ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.as_ptr(), SDDL_REVISION_1, &mut sd, std::ptr::null_mut()) } == 0 {
@@ -590,10 +605,11 @@ mod servicio {
         let r = unsafe {
             GetSecurityDescriptorOwner(sd, &mut dueno, &mut d1);
             GetSecurityDescriptorDacl(sd, &mut d2, &mut dacl, &mut d1);
-            let ruta: Vec<u16> = std::os::windows::ffi::OsStrExt::encode_wide(dir.as_os_str()).chain([0]).collect();
-            let r = SetNamedSecurityInfoW(ruta.as_ptr(), SE_FILE_OBJECT,
-                                          OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
-                                          dueno, std::ptr::null_mut(), dacl, std::ptr::null());
+            // también a lo que hay dentro, sin conservar permisos propios de cada archivo (KeepExplicit = FALSE)
+            let r = TreeResetNamedSecurityInfoW(ruta.as_ptr(), SE_FILE_OBJECT,
+                                                OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
+                                                dueno, std::ptr::null_mut(), dacl, std::ptr::null(), 0, None, ProgressInvokeNever,
+                                                std::ptr::null());
             LocalFree(sd as _);
             r
         };
