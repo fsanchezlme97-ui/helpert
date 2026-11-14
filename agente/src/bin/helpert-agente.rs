@@ -541,9 +541,8 @@ mod servicio {
     }
 
     fn principal(_args: Vec<std::ffi::OsString>) {
-        if let Err(e) = carpeta_protegida() {
-            // sin registro: el archivo estaría justo en esa carpeta
-            panic!("{e}");
+        if let Err(e) = proteger_carpeta() {
+            panic!("{e}"); // sin registro: el archivo estaría justo en esa carpeta
         }
         registro();
         let h = service_control_handler::register(NOMBRE, |c| match c {
@@ -565,46 +564,59 @@ mod servicio {
         super::arrancar();
     }
 
-    /// ProgramData\Helpert (configuración con el token, registro y carpeta temporal de los scripts) debe ser de
-    /// SYSTEM o de Administradores y no un enlace: ProgramData deja a cualquier usuario crear carpetas, y quien la
-    /// creara antes de instalar podría cambiar la configuración o desviar lo que el servicio escribe ahí.
-    /// El instalador la crea así; si no lo está, el servicio no arranca.
-    fn carpeta_protegida() -> Result<(), String> {
+    /// ProgramData\Helpert guarda la configuración con el token, el registro y la carpeta temporal de los scripts.
+    /// ProgramData deja a cualquier usuario crear carpetas, así que en cada arranque el servicio (SYSTEM) se la apropia
+    /// con permisos propios, sin herencia: solo SYSTEM y Administradores. Si es un enlace, no arranca. Lo que alguien
+    /// pudiera haber dejado dentro antes (un enlace con el nombre de la carpeta temporal o del registro) no se abre:
+    /// tmp se borra y se crea de nuevo, y el registro anterior se renombra antes de crear uno nuevo.
+    fn proteger_carpeta() -> Result<(), String> {
         use std::os::windows::fs::MetadataExt;
         use windows_sys::Win32::Foundation::{LocalFree, ERROR_SUCCESS};
-        use windows_sys::Win32::Security::Authorization::{GetNamedSecurityInfoW, SE_FILE_OBJECT};
-        use windows_sys::Win32::Security::{IsWellKnownSid, WinBuiltinAdministratorsSid, WinLocalSystemSid, OWNER_SECURITY_INFORMATION};
+        use windows_sys::Win32::Security::Authorization::*;
+        use windows_sys::Win32::Security::*;
         let dir = carpeta();
+        let _ = std::fs::create_dir(&dir);
         let m = std::fs::symlink_metadata(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         if m.file_attributes() & 0x400 != 0 || !m.is_dir() {
-            return Err(format!("{} es un enlace o no es una carpeta", dir.display()));
+            return Err(format!("{} es un enlace o no es una carpeta; reinstala Helpert", dir.display()));
         }
-        let ancho: Vec<u16> = std::os::windows::ffi::OsStrExt::encode_wide(dir.as_os_str()).chain([0]).collect();
-        let (mut dueno, mut sd) = (std::ptr::null_mut(), std::ptr::null_mut());
+        let ancho = |t: &str| t.encode_utf16().chain([0]).collect::<Vec<u16>>();
+        let mut sd = std::ptr::null_mut();
+        let sddl = ancho("O:SYD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)");
+        if unsafe { ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.as_ptr(), SDDL_REVISION_1, &mut sd, std::ptr::null_mut()) } == 0 {
+            return Err("descriptor de seguridad".into());
+        }
+        let (mut dueno, mut dacl, mut d1, mut d2) = (std::ptr::null_mut(), std::ptr::null_mut(), 0, 0);
         let r = unsafe {
-            GetNamedSecurityInfoW(ancho.as_ptr(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &mut dueno,
-                                  std::ptr::null_mut(), std::ptr::null_mut(), std::ptr::null_mut(), &mut sd)
+            GetSecurityDescriptorOwner(sd, &mut dueno, &mut d1);
+            GetSecurityDescriptorDacl(sd, &mut d2, &mut dacl, &mut d1);
+            let ruta: Vec<u16> = std::os::windows::ffi::OsStrExt::encode_wide(dir.as_os_str()).chain([0]).collect();
+            let r = SetNamedSecurityInfoW(ruta.as_ptr(), SE_FILE_OBJECT,
+                                          OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
+                                          dueno, std::ptr::null_mut(), dacl, std::ptr::null());
+            LocalFree(sd as _);
+            r
         };
-        let ok = r == ERROR_SUCCESS
-            && unsafe { IsWellKnownSid(dueno, WinLocalSystemSid) != 0 || IsWellKnownSid(dueno, WinBuiltinAdministratorsSid) != 0 };
-        if !sd.is_null() {
-            unsafe { LocalFree(sd as _) };
+        if r != ERROR_SUCCESS {
+            return Err(format!("{}: no pude fijar sus permisos (error {r})", dir.display()));
         }
-        if ok { Ok(()) } else { Err(format!("{} no es de SYSTEM ni de Administradores; reinstala Helpert", dir.display())) }
+        let tmp = dir.join("tmp");
+        let _ = std::fs::remove_dir_all(&tmp); // si es un enlace, borra el enlace, no lo que apunta
+        std::fs::create_dir(&tmp).map_err(|e| format!("{}: {e}", tmp.display()))?;
+        let _ = std::fs::rename(dir.join("agente.log"), dir.join("agente.anterior.log"));
+        Ok(())
     }
 
     fn carpeta() -> std::path::PathBuf {
         std::path::PathBuf::from(std::env::var("ProgramData").unwrap_or_else(|_| r"C:\ProgramData".into())).join("Helpert")
     }
 
-    /// Lo que el agente escribe en stderr va a un archivo (un servicio no tiene consola). Empieza de nuevo
-    /// si pasa de 5 MB.
+    /// Lo que el agente escribe en stderr va a un archivo nuevo en cada arranque (un servicio no tiene consola); el
+    /// anterior queda como agente.anterior.log.
     fn registro() {
         use std::os::windows::io::IntoRawHandle;
         use windows_sys::Win32::System::Console::{SetStdHandle, STD_ERROR_HANDLE};
-        let ruta = carpeta().join("agente.log");
-        let grande = std::fs::metadata(&ruta).is_ok_and(|m| m.len() > 5 << 20);
-        let f = std::fs::OpenOptions::new().create(true).append(!grande).write(true).truncate(grande).open(&ruta);
+        let f = std::fs::OpenOptions::new().write(true).create_new(true).open(carpeta().join("agente.log"));
         if let Ok(f) = f {
             unsafe { SetStdHandle(STD_ERROR_HANDLE, f.into_raw_handle() as _) };
         }
