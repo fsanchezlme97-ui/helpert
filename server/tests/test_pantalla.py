@@ -97,3 +97,22 @@ def test_marcas_numeradas():
     assert out.getpixel((10, 60)) == (255, 0, 110) and img.getpixel((10, 60)) == (255, 255, 255)  # dibuja en una copia
     assert pantalla.a_pixeles([0, 0, 1000, 1000], 1920, 1080) == [0, 0, 1920, 1080]
     assert pantalla.a_pixeles([500, 500, 501, 501], 1920, 1080) is None  # caja de nada
+
+
+def test_topes_de_la_guia(servidor, falso):
+    api, r = con_guia(servidor, falso)
+    for _ in range(2 * pantalla.MAX_PASOS):  # intentos que fallan también cuentan
+        falso["b"] += ["x", "x"]
+        assert "error" in pedir(api, r["caso_id"]).json()
+    assert pedir(api, r["caso_id"]).status_code == 429
+    buf = io.BytesIO()
+    Image.new("1", (9000, 9000)).save(buf, "PNG")  # pocos bytes, muchos píxeles
+    with db.conexion(api.ruta_db) as c:
+        c.execute("UPDATE casos SET pantalla_intentos = 0")
+    assert pedir(api, r["caso_id"], imagen=base64.b64encode(buf.getvalue()).decode()).status_code == 422
+
+
+def test_etiqueta_con_datos_privados_no_se_muestra(servidor, falso):
+    api, r = con_guia(servidor, falso)
+    falso["b"] += [elementos("Ingresa tu contraseña"), paso(marca=1, instruccion="Haz clic aquí.")]
+    assert pedir(api, r["caso_id"]).json()["estado"] == "escalado"

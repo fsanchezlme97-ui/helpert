@@ -18,7 +18,7 @@ hallados() {
   while IFS= read -r f; do
     info="$T/info/$f.trashinfo"
     [ -f "$info" ] || continue
-    ruta=$(sed -n 's/^Path=//p' "$info" | head -1)
+    ruta=$(como sed -n 's/^Path=//p' "$info" | head -1)  # con los permisos de la persona: un enlace no lee archivos ajenos
     ruta=$(printf '%b' "${ruta//%/\\x}")   # la ruta viene codificada como URL (%20 = espacio)
     [[ $ruta == /* ]] || ruta="$casa/$ruta"
     printf '%s\t%s\n' "$f" "$ruta"

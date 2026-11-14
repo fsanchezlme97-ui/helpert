@@ -59,6 +59,8 @@ CREATE TABLE IF NOT EXISTS auditoria (
 ALTER TABLE casos ADD COLUMN IF NOT EXISTS tokens_entrada integer NOT NULL DEFAULT 0;
 ALTER TABLE casos ADD COLUMN IF NOT EXISTS tokens_salida integer NOT NULL DEFAULT 0;
 ALTER TABLE casos ADD COLUMN IF NOT EXISTS costo_usd numeric(12, 6) NOT NULL DEFAULT 0;
+-- Llamadas a la guía en pantalla (también las fallidas): tope de costo por caso.
+ALTER TABLE casos ADD COLUMN IF NOT EXISTS pantalla_intentos integer NOT NULL DEFAULT 0;
 ALTER TABLE equipos ADD COLUMN IF NOT EXISTS area text;
 ALTER TABLE equipos ADD COLUMN IF NOT EXISTS sede text;
 ALTER TABLE equipos ADD COLUMN IF NOT EXISTS piso text;

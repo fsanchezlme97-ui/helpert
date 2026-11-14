@@ -23,6 +23,7 @@ from . import ia
 
 MAX_PASOS = 12
 MAX_ELEMENTOS = 40
+MAX_PIXELES = 40_000_000  # ~ dos pantallas 4K: más que eso no es una captura
 LADO_MAX = 1600  # la imagen que ve el modelo; las cajas son relativas (0-1000), así que no cambian
 ACCIONES = ("clic", "doble_clic", "desplazar_abajo", "desplazar_arriba", "ninguna")
 PRIVADO = re.compile(r"contrase[ñn]a|password|\bclave\b|\bpin\b|tarjeta|c[oó]digo de (verificaci[oó]n|seguridad)|token|cvv", re.I)
@@ -80,9 +81,14 @@ Responde solo JSON: {{"marca": 0, "accion": "ninguna", "instruccion": "...", "te
 
 def reducir(png: bytes) -> tuple[Image.Image, int, int]:
     """Imagen RGB a lo sumo de LADO_MAX de ancho, y el tamaño original (las cajas se devuelven en píxeles originales)."""
-    img = Image.open(io.BytesIO(png))
+    try:
+        img = Image.open(io.BytesIO(png))
+    except Image.DecompressionBombError as e:
+        raise OSError(str(e)) from e
+    ancho, alto = img.size  # del encabezado: se rechaza antes de descomprimir una imagen enorme
+    if ancho * alto > MAX_PIXELES:
+        raise OSError(f"imagen demasiado grande: {ancho} × {alto}")
     img.load()
-    ancho, alto = img.size
     img = img.convert("RGB")
     if ancho > LADO_MAX:
         img = img.resize((LADO_MAX, round(alto * LADO_MAX / ancho)))
@@ -192,7 +198,8 @@ def siguiente(cadena: list[dict], png: bytes, objetivo: str, pasos: list[str]):
         r["etiqueta"], _, r["caja"] = validos[paso.marca - 1]
     elif r["accion"] != "ninguna":
         r["accion"] = "ninguna"  # sin elemento no hay dónde hacer clic
-    if PRIVADO.search(instruccion) or ia.SOSPECHOSO.search(instruccion):
+    revisar = f"{instruccion} {r['etiqueta'] or ''}"  # la etiqueta también sale de la pantalla y se muestra
+    if PRIVADO.search(revisar) or ia.SOSPECHOSO.search(revisar):
         # la pantalla (o el modelo) pide datos privados o comandos: no se muestra como paso de Helpert
         return {**r, "accion": "ninguna", "caja": None, "escalar": True,
                 "instruccion": "Este paso pide datos privados o algo que no hago en el primer nivel."}, "paso bloqueado", total

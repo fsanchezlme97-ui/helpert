@@ -467,8 +467,13 @@ def crear_app(cfg: dict) -> FastAPI:
             caso = caso_de(c, eq["id"], k.caso_id, k.usuario)
             aj = ajustes.leer(c, cfg, caso["empresa_id"])
             cadena = cadena_pantalla(c, caso, eq["area"], aj)
-            if caso["estado"] != "esperando_cierre" or caso["playbook"] or not cadena:
+            if (caso["estado"] != "esperando_cierre" or caso["playbook"] or not cadena
+                    or caso["creado"] < db.ahora() - timedelta(days=1)):
                 raise HTTPException(409, "La guía en pantalla no está disponible para este caso")
+            # cada llamada cuenta, también las que fallan: el tope limita el costo del caso, no solo los pasos dados
+            if caso["pantalla_intentos"] >= 2 * pantalla.MAX_PASOS:
+                raise HTTPException(429, "La guía en pantalla llegó a su límite en este caso")
+            c.execute("UPDATE casos SET pantalla_intentos = pantalla_intentos + 1 WHERE id = %s", (caso["id"],))
             filas = c.execute("SELECT rol, texto FROM mensajes WHERE caso_id = %s ORDER BY id", (caso["id"],)).fetchall()
         pasos = [f["texto"] for f in filas if f["rol"] == "pantalla"]
         if len(pasos) >= pantalla.MAX_PASOS:
