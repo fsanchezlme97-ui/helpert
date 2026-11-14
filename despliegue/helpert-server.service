@@ -1,4 +1,4 @@
-# /etc/systemd/system/helpert-server.service · servidor de Helpert en la VPS (sin probar aún).
+# /etc/systemd/system/helpert-server.service · servidor de Helpert en la VPS (lo instala instalar-servidor.sh).
 # Requiere: usuario «helpert», el repositorio en /opt/helpert, uv instalado y /etc/helpert/servidor.env con:
 #   HELPERT_DB=postgresql://...        (cadena de Supabase)
 #   HELPERT_CLAVE_MAESTRA=...          (cifra las claves de API guardadas en la consola; 32 bytes en base64 url:

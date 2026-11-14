@@ -9,7 +9,7 @@
 
 Asistente de soporte TI Nivel 1. El plan completo está en [Helpert_Plan_de_desarrollo.md](Helpert_Plan_de_desarrollo.md).
 
-Estado: versión multiempresa funcionando en Linux. Incluye servidor, agente (servicio systemd), bandeja con inicio de sesión, chat, historial, ayuda y perfil, instalador de un archivo, 18 playbooks (Linux) y consola web con casos por nivel (N1 Helpert, N2 en sitio, N3 analista), empresas con fondo de IA, métricas configurables con exportación CSV y administración, sobre PostgreSQL. Windows viene después.
+Estado: versión multiempresa funcionando en Linux. Incluye servidor, agente (servicio systemd), bandeja con inicio de sesión, chat, historial, ayuda y perfil, instalador de un archivo, 18 playbooks (13 también en Windows) y consola web con casos por nivel (N1 Helpert, N2 en sitio, N3 analista), empresas con fondo de IA, métricas configurables con exportación CSV y administración, sobre PostgreSQL. El agente y la bandeja también compilan y se prueban para Windows (falta un PC real).
 
 Infraestructura: en la nube. El servidor y la consola van en una VPS detrás de Caddy (HTTPS); los datos, en Supabase (PostgreSQL). La IA principal es Gemini (API de Google) y Ollama es el respaldo.
 
@@ -23,7 +23,7 @@ Infraestructura: en la nube. El servidor y la consola van en una VPS detrás de 
 | `web/` | Estilos y scripts de la consola y de la bandeja: Tailwind + componentes de shadcn/ui, DataTables, Choices.js, ECharts, fuente Inter. `npm run build` deja el resultado en `server/helpert_server/estatico/` y `bandeja/ui/` |
 | `playbooks/` | Playbooks: `manifest.toml` + un script por sistema |
 | `eval/` | Casos etiquetados y resultados de la evaluación por modelo |
-| `despliegue/` | Instalador del agente para Linux, empaquetador `helpert-instalar.run`, Caddyfile y unidad systemd de la VPS (esta última sin probar) |
+| `despliegue/` | Instaladores y empaquetadores del agente (Linux `.run`, Windows `.zip`) e instalación del servidor en la VPS (Caddy, systemd, respaldo) |
 | `pruebas/` | Playbook inofensivo para las pruebas automáticas |
 
 ## Probar en este equipo
@@ -84,6 +84,21 @@ Clic en el icono: el chat se despliega como panel flotante en la esquina de la b
 
 Iconos de la bandeja: verde, disponible; azul, pensando (esperando al servidor o a la IA); amarillo, trabajando (corre un paso de playbook); rojo con punto, aviso (respuesta sin leer o error). Usa la versión oscura si el escritorio tiene el esquema oscuro (o no hay gsettings); se fuerza con `HELPERT_TEMA=claro|oscuro`.
 
+## Instalar el agente en Windows
+
+Windows 10 y 11, x64. Se compila y se prueba en la CI (`.github/workflows/ci.yml`, trabajo `windows`: pruebas del agente y de la bandeja, los scripts de los playbooks con PowerShell 5.1 y una prueba de punta a punta con el servicio real, la tubería y un servidor). El artefacto `helpert-windows` trae los `.exe`.
+
+```sh
+despliegue/empaquetar-windows.sh --servidor https://helpert.miempresa.pe --clave-publica playbooks.pub \
+    --inscripcion-archivo inscripcion.txt     # → helpert-windows.zip; baja los .exe de la CI de este mismo commit
+```
+
+En el equipo: descomprimir y doble clic en «Instalar Helpert.cmd» (pide permisos de administrador). Para GPO o Intune: `powershell -ExecutionPolicy Bypass -File instalar.ps1 -Silencioso`. Instala el servicio `Helpert` (LocalSystem; se reinicia solo si falla), la bandeja (arranca al iniciar sesión y está en el menú Inicio), WebView2 si falta (comprueba que lo firma Microsoft) y registra el equipo con la clave de inscripción. Datos y registro en `C:\ProgramData\Helpert`, solo para SYSTEM y Administradores. `helpert.exe --estado` dice si el servicio y el servidor responden. Para quitarlo: «Desinstalar Helpert.cmd».
+
+Clic en el icono: el panel se despliega en la esquina, como OneDrive; clic derecho: «Abrir Helpert» y «Salir». La bandeja y la guía en pantalla con «Hazlo tú» (SendInput) solo se han comprobado compilando: falta probarlas en un PC real, igual que SmartScreen/Defender con los `.exe` sin firma de código (pedirán confirmación hasta firmarlos con un certificado de editor) y los avisos del sistema (hoy solo cambia el icono).
+
+Playbooks con script de Windows: 13 de 18. Sin script: `audio.mic`, `audio.output`, `bluetooth.restart`, `net.network-drive` y `net.vpn` (dependen de la sesión de la persona y no se pueden hacer ni comprobar bien desde el servicio); en Windows esos casos van a guía o a un técnico.
+
 ## Pruebas
 
 ```sh
@@ -92,15 +107,27 @@ Iconos de la bandeja: verde, disponible; azul, pensando (esperando al servidor o
 (cd agente && cargo test -q -- --ignored)        # HTTPS real contra internet
 ```
 
-## Desplegar en la VPS (pendiente de probar)
+## Llevar el servidor a producción
 
-1. Crear el proyecto de Supabase y copiar la cadena de conexión de PostgreSQL. El servidor crea el esquema `helpert`, que la API pública de Supabase no expone.
-2. En la VPS: usuario `helpert`, el repositorio en `/opt/helpert`, `uv`, Caddy con [despliegue/Caddyfile](despliegue/Caddyfile) y [despliegue/helpert-server.service](despliegue/helpert-server.service).
-3. `/etc/helpert/helpert-server.toml` a partir de [server/helpert-server.example.toml](server/helpert-server.example.toml), con `clave_publica` (la de los playbooks, para comprobar las versiones del agente), y `/etc/helpert/servidor.env` con `HELPERT_DB` y `HELPERT_CLAVE_MAESTRA` (permisos 600). Las claves de API se escriben en Consola → Administración → IA y se guardan cifradas; si se pierde la clave maestra, hay que volver a escribirlas.
-4. Registrar cada equipo (`helpert-server equipo-nuevo NOMBRE`) y crear la primera cuenta de administración (`helpert-server usuario-consola CORREO --rol admin`); empresas, personas, cuentas y equipos se gestionan desde Consola → Administración. Para enviar los códigos por correo, añadir `[smtp]` (`host`, `puerto`, `usuario`, `remitente`) y la contraseña en `HELPERT_SMTP_CLAVE`.
-5. **Firmar los playbooks fuera de la VPS.** La clave privada nunca va al servidor, al repositorio ni a los equipos. A la VPS y a los equipos solo llegan los playbooks, sus firmas y la clave pública.
-6. **Versiones del agente.** Fuera de la VPS: `helpert-server firmar-agente agente/target/release/helpert-agente --version X --clave CLAVE_PRIVADA`. En la VPS: `helpert-server publicar-agente BINARIO --version X --firma BINARIO.firma`. Publica primero la versión que ya tienen los equipos y márcala estable (es a la que se vuelve); luego la nueva se despliega por etapas en Consola → Administración → Equipos (piloto, porcentaje, pasar a todos o volver atrás); cada agente comprueba la firma, prueba el binario nuevo (`--version`) y se reinicia. La bandeja aún se actualiza reinstalando.
-7. Retención de capturas: el servidor borra las vencidas cada hora; `helpert-server purgar` lo hace a mano.
+Una VPS con Debian 12+ o Ubuntu 24.04+, un nombre DNS apuntando a ella (los agentes solo hablan HTTPS) y los puertos 80 y 443 abiertos. Lo probado: el servidor, `revisar`, `/salud`, el respaldo y su rotación, en este equipo; el script de instalación completo aún no se ha corrido en una VPS real.
+
+1. **En tu equipo, firma los playbooks.** La clave privada nunca va a la VPS, al repositorio ni a los equipos:
+   ```sh
+   uv run --project server helpert-server claves ~/helpert-claves            # una sola vez; guárdala fuera de línea
+   uv run --project server helpert-server firmar playbooks --clave ~/helpert-claves/playbooks.key
+   ```
+2. **Copia el repositorio (con las firmas) y la clave pública a la VPS**, por ejemplo con `rsync -a --exclude .git --exclude .dev --exclude target ./ vps:helpert/` y `scp ~/helpert-claves/playbooks.pub vps:`.
+3. **En la VPS:** `sudo helpert/despliegue/instalar-servidor.sh --dominio helpert.miempresa.pe --clave-publica playbooks.pub`. Instala PostgreSQL local (o `--db-env` para usar Supabase: pon la cadena en `HELPERT_DB` y vuelve a ejecutarlo), `uv`, Caddy con HTTPS, el servicio, el respaldo diario (`/var/backups/helpert`, se guardan 14) y el cortafuegos. Genera en `/etc/helpert/servidor.env` la clave maestra y la de inscripción; **guarda una copia de la clave maestra fuera de la VPS**: sin ella, las claves de API guardadas en la consola no se pueden leer. Volver a ejecutarlo actualiza el código sin tocar la configuración ni los secretos.
+4. `sudo helpert-server usuario-consola TU-CORREO --rol admin`, entra en `https://DOMINIO/consola` y pon la clave de la IA en Administración → IA (la capa gratuita de Gemini es solo para pruebas).
+5. `sudo helpert-server revisar` comprueba la base, la cuenta admin, la clave maestra, la inscripción, la firma de cada playbook contra la clave pública, las claves de la IA y el correo; sale con 1 si falta algo. `https://DOMINIO/salud` responde 200 si el servidor llega a la base (sirve para un monitor externo).
+
+**Traer los datos de desarrollo** (opcional): en tu equipo `pg_dump --format=custom --no-owner "postgresql://helpert@/helpert?host=$PWD/.dev/pgsock" > helpert.dump`, cópialo y en la VPS `sudo -u helpert pg_restore --clean --if-exists --no-owner -d helpert helpert.dump`. Copia también el valor de `.dev/clave-maestra` en `HELPERT_CLAVE_MAESTRA` (si no, vuelve a escribir las claves de API) y reinicia con `sudo systemctl restart helpert-server`. Los equipos registrados contra el servidor de desarrollo hay que reinstalarlos con el paquete nuevo (apuntan a otra dirección).
+
+Más:
+- Correo para los códigos de acceso: bloque `[smtp]` en `/etc/helpert/helpert-server.toml` y la contraseña en `HELPERT_SMTP_CLAVE`.
+- **Versiones del agente.** Fuera de la VPS: `helpert-server firmar-agente BINARIO --version X --so linux|windows --clave CLAVE_PRIVADA`. En la VPS: `sudo helpert-server publicar-agente BINARIO --version X --firma BINARIO.firma`. Publica primero la versión que ya tienen los equipos y márcala estable (es a la que se vuelve); la nueva se despliega por etapas en Consola → Administración → Equipos. Cada agente comprueba la firma, prueba el binario nuevo (`--version`) y se reinicia. La bandeja aún se actualiza reinstalando.
+- Retención de capturas: el servidor borra las vencidas cada hora; `sudo helpert-server purgar` lo hace a mano.
+- Restaurar un respaldo: `sudo -u helpert pg_restore --clean --if-exists -d helpert /var/backups/helpert/helpert-AAAAMMDD-HHMM.dump`. Copia esos archivos fuera de la VPS con tu sistema de respaldo.
 
 ## Reglas
 

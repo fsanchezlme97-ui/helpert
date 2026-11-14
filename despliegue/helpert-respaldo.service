@@ -1,0 +1,14 @@
+# Respaldo de la base de Helpert (despliegue/respaldar.sh); lo instala instalar-servidor.sh.
+[Unit]
+Description=Helpert · respaldo de la base
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=helpert
+ExecStart=/opt/helpert/despliegue/respaldar.sh
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/backups/helpert
