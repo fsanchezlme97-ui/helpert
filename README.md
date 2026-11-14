@@ -47,7 +47,7 @@ La consola queda en <http://127.0.0.1:8765/consola>. Roles:
 
 Las personas de la bandeja entran con su correo y un código. Si hay `[smtp]` en la configuración, el código llega por correo; si no, lo genera soporte en Consola → Empresas → Personas, o con `helpert-server persona`. Un correo cuyo dominio esté en los dominios de una empresa se da de alta solo. El primer inicio de sesión liga el equipo a la empresa de esa persona.
 
-Interfaz: paleta Oxocarbon en modo claro y oscuro (sigue al sistema); el azul del casco «pensando» es el color principal. Tras cambiar algo en `web/` o en las clases de `consola.py` / `bandeja/ui`: `(cd web && npm ci && npm run build)`.
+Interfaz: paleta Oxocarbon en modo claro y oscuro (sigue al sistema); el azul de la marca es el color principal. Tras cambiar algo en `web/` o en las clases de `consola.py` / `bandeja/ui`: `(cd web && npm ci && npm run build)`.
 
 El agente corre sin privilegios en desarrollo: los diagnósticos funcionan, y los pasos que cambian algo se detienen en «comprobar» y se escalan. Para ver el ciclo completo con un playbook inofensivo:
 
@@ -76,9 +76,11 @@ En el equipo: `sh helpert-instalar.run`. Desde la terminal pide la contraseña c
 - la bandeja, que arranca al iniciar sesión y aparece en el menú de aplicaciones;
 - el registro del equipo en el servidor, con la clave de inscripción (`inscripcion_env` en la configuración del servidor).
 
-Si faltan WebKitGTK o AppIndicator, los instala con apt, dnf o pacman; solo se probó en CachyOS (Hyprland con Quickshell). En Ubuntu y Fedora falta probarlo en una VM, incluidos los nombres de los paquetes. Al reinstalar se conserva el token del equipo. Para quitarlo: `sudo despliegue/instalar-agente-linux.sh --desinstalar`.
+Si falta WebKitGTK, lo instala con apt, dnf o pacman; solo se probó en CachyOS (Hyprland con Quickshell). En Ubuntu y Fedora falta probarlo en una VM, incluidos los nombres de los paquetes. Al reinstalar se conserva el token del equipo. Para quitarlo: `sudo despliegue/instalar-agente-linux.sh --desinstalar`.
 
 Con el agente como root, lo que el usuario confirma en el chat se aplica de verdad: limpiar archivos temporales, vaciar la cola de impresión o reiniciar la red.
+
+Clic en el icono: el chat se despliega como panel flotante en la esquina de la barra, como OneDrive en Windows (en Wayland, una capa pegada a la barra, sin taparla); se recoge con otro clic, Esc o al hacer clic fuera. Clic derecho: «Abrir Helpert» y «Salir». El icono se publica por D-Bus (StatusNotifierItem), sin AppIndicator.
 
 Iconos de la bandeja: verde, disponible; azul, pensando (esperando al servidor o a la IA); amarillo, trabajando (corre un paso de playbook); rojo con punto, aviso (respuesta sin leer o error). Usa la versión oscura si el escritorio tiene el esquema oscuro (o no hay gsettings); se fuerza con `HELPERT_TEMA=claro|oscuro`.
 

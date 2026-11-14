@@ -1,4 +1,5 @@
-//! helpert-bandeja: el icono de Helpert en la bandeja (app indicators) y la ventana de chat.
+//! helpert-bandeja: el icono de Helpert en la bandeja (StatusNotifierItem) y el panel de chat, como el de OneDrive:
+//! un clic en el icono despliega el panel junto a la barra y se recoge al hacer clic fuera.
 //! Corre como el usuario y habla con el servicio del equipo por el socket local, igual que el chat de terminal.
 //!
 //! Estados del icono (logo y estados helpert.jpg): disponible, pensando (esperando al servidor o a la IA),
@@ -10,11 +11,10 @@ use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
+use std::sync::atomic::Ordering;
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tauri::image::Image;
-use tauri::menu::{Menu, MenuItem};
-use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Manager, WindowEvent};
 
 #[derive(Clone, Copy, PartialEq)]
@@ -26,6 +26,7 @@ enum Estado {
 }
 
 struct Actual(Mutex<Estado>);
+struct Icono(ksni::Handle<Bandeja>);
 struct Notificados(Mutex<HashSet<i64>>); // avisos ya notificados al escritorio
 
 fn png(e: Estado, oscuro: bool) -> &'static [u8] {
@@ -56,8 +57,52 @@ fn oscuro() -> bool {
 
 fn poner(app: &AppHandle, e: Estado) {
     *app.state::<Actual>().0.lock().unwrap() = e;
-    if let Some(tray) = app.tray_by_id("helpert") {
-        let _ = tray.set_icon(Image::from_bytes(png(e, oscuro())).ok());
+    if let Some(i) = app.try_state::<Icono>() {
+        i.0.update(|b| b.estado = e);
+    }
+}
+
+/// PNG → ARGB32 en orden de red, el formato de los iconos de StatusNotifierItem. La imagen va en el mensaje D-Bus, no
+/// como archivo: así ninguna barra muestra una copia vieja guardada por ruta.
+fn argb(png: &[u8]) -> ksni::Icon {
+    let img = Image::from_bytes(png).expect("icono PNG incluido en el binario");
+    let data = img.rgba().chunks_exact(4).flat_map(|p| [p[3], p[0], p[1], p[2]]).collect();
+    ksni::Icon { width: img.width() as i32, height: img.height() as i32, data }
+}
+
+/// El icono de la bandeja. Clic: abre o cierra el panel. Clic derecho: menú.
+struct Bandeja {
+    estado: Estado,
+    oscuro: bool,
+    app: AppHandle,
+}
+
+impl ksni::Tray for Bandeja {
+    fn id(&self) -> String {
+        "helpert".into()
+    }
+    fn title(&self) -> String {
+        "Helpert".into()
+    }
+    fn icon_pixmap(&self) -> Vec<ksni::Icon> {
+        vec![argb(png(self.estado, self.oscuro))]
+    }
+    fn tool_tip(&self) -> ksni::ToolTip {
+        ksni::ToolTip { title: "Helpert · soporte TI".into(), ..Default::default() }
+    }
+    fn activate(&mut self, _x: i32, _y: i32) {
+        let a = self.app.clone(); // ksni llama desde su hilo; las ventanas se tocan en el principal
+        let _ = self.app.run_on_main_thread(move || alternar(&a));
+    }
+    fn menu(&self) -> Vec<ksni::MenuItem<Self>> {
+        use ksni::menu::StandardItem;
+        vec![
+            StandardItem { label: "Abrir Helpert".into(), activate: Box::new(|b: &mut Self| {
+                let a = b.app.clone();
+                let _ = b.app.run_on_main_thread(move || mostrar(&a));
+            }), ..Default::default() }.into(),
+            StandardItem { label: "Salir".into(), activate: Box::new(|b: &mut Self| b.app.exit(0)), ..Default::default() }.into(),
+        ]
     }
 }
 
@@ -67,9 +112,84 @@ fn socket() -> String {
 
 fn mostrar(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("chat") {
+        *MOSTRADO.lock().unwrap() = Some(Instant::now());
         let _ = w.show();
         let _ = w.unminimize();
         let _ = w.set_focus();
+    }
+}
+
+/// Cuándo se abrió y cuándo se recogió el panel por perder el foco.
+static MOSTRADO: Mutex<Option<Instant>> = Mutex::new(None);
+static RECOGIDO: Mutex<Option<Instant>> = Mutex::new(None);
+
+/// ¿Pasó hace menos de 400 ms?
+fn reciente(t: &Mutex<Option<Instant>>) -> bool {
+    t.lock().unwrap().is_some_and(|t| t.elapsed() < Duration::from_millis(400))
+}
+
+/// El clic en el icono: abre el panel o lo recoge.
+fn alternar(app: &AppHandle) {
+    let Some(w) = app.get_webview_window("chat") else { return };
+    if w.is_visible().unwrap_or(false) {
+        let _ = w.hide();
+    } else if !reciente(&RECOGIDO) {
+        mostrar(app); // (si se acaba de recoger, fue este mismo clic al quitarle el foco: era para cerrarlo)
+    }
+}
+
+/// ¿La barra del escritorio está arriba? En Hyprland, por el espacio que reserva en el monitor activo
+/// ([izquierda, arriba, derecha, abajo]); en los demás, se asume abajo, como en Windows.
+fn barra_arriba() -> bool {
+    std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some()
+        && std::process::Command::new("hyprctl").args(["-j", "monitors"]).output().ok()
+            .and_then(|o| serde_json::from_slice::<Value>(&o.stdout).ok())
+            .and_then(|v| v.as_array()?.iter().find(|m| m["focused"] == true)?["reserved"].as_array().cloned())
+            .is_some_and(|r| r.len() == 4 && r[1].as_i64() > r[3].as_i64())
+}
+
+/// La ventana de chat como panel en la esquina de la barra, del lado derecho (donde está la bandeja).
+fn preparar_panel(w: &tauri::WebviewWindow, abrir: bool) {
+    let arriba = barra_arriba();
+    #[cfg(target_os = "linux")]
+    if guia::capa(w, 2, &[1, if arriba { 2 } else { 3 }], 8, 0, 2, c"helpert-panel") {
+        // Wayland: el compositor lo pone junto a la barra, sin taparla. La primera vez que se muestra, la capa no
+        // aparece (Hyprland 0.57, GTK 3): se muestra (no se ve) y se oculta un momento después, en otra vuelta del
+        // bucle de eventos (en la misma no sirve), para que el primer clic de la persona sí lo abra.
+        let _ = w.show();
+        let h = w.app_handle().clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(300));
+            let _ = h.clone().run_on_main_thread(move || {
+                if let Some(w) = h.get_webview_window("chat") {
+                    let _ = w.hide();
+                }
+                if abrir {
+                    mostrar(&h);
+                }
+            });
+        });
+        return;
+    }
+    // X11 y escritorios sin capas: en la esquina del monitor principal.
+    // shortcut: el alto de la barra se supone de 48 px; leerlo (_NET_WORKAREA) si queda encima o lejos
+    if let (Ok(Some(m)), Ok(t)) = (w.primary_monitor(), w.outer_size()) {
+        let (mp, ms, borde) = (m.position(), m.size(), (12.0 * m.scale_factor()) as i32);
+        let barra = (48.0 * m.scale_factor()) as i32;
+        let x = mp.x + ms.width as i32 - t.width as i32 - borde;
+        let y = if arriba { mp.y + barra + borde } else { mp.y + ms.height as i32 - t.height as i32 - barra - borde };
+        let _ = w.set_position(tauri::PhysicalPosition::new(x, y));
+    }
+    if abrir {
+        mostrar(w.app_handle());
+    }
+}
+
+/// Esc en el panel lo recoge.
+#[tauri::command]
+fn recoger(app: AppHandle) {
+    if let Some(w) = app.get_webview_window("chat") {
+        let _ = w.hide();
     }
 }
 
@@ -232,53 +352,24 @@ fn ya_abierta() -> Option<std::os::unix::net::UnixListener> {
     std::os::unix::net::UnixListener::bind(&ruta).ok()
 }
 
-/// Carpeta de los PNG del icono de la bandeja, nueva en cada ejecución (~/.cache/helpert/bandeja/<pid>). El app indicator
-/// los pasa por ruta: con la ruta de siempre (/run/user/N/tray-icon/tray-icon-helpert-0.png), una barra que guarda las
-/// imágenes por ruta mostraba el icono de una versión anterior; y algunas barras cambian los de /run y /tmp por el del tema.
-fn carpeta_iconos() -> Option<std::path::PathBuf> {
-    let cache = std::env::var_os("XDG_CACHE_HOME").map(std::path::PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".cache")))?;
-    let base = cache.join("helpert").join("bandeja");
-    if let Ok(viejas) = std::fs::read_dir(&base) {
-        for d in viejas.flatten() {
-            let _ = std::fs::remove_dir_all(d.path()); // de ejecuciones anteriores: solo corre una bandeja por sesión
-        }
-    }
-    Some(base.join(std::process::id().to_string()))
-}
-
 fn main() {
     let Some(unica) = ya_abierta() else { return };
     tauri::Builder::default()
         .manage(Actual(Mutex::new(Estado::Disponible)))
         .manage(Notificados(Mutex::new(HashSet::new())))
         .manage(guia::Ultimo(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![enviar, consultar, capturar, abrir_remoto, abrir,
+        .invoke_handler(tauri::generate_handler![enviar, consultar, capturar, abrir_remoto, abrir, recoger,
                                                  guia::guia_paso, guia::guia_actuar, guia::guia_cerrar])
         .setup(|app| {
-            let menu = Menu::with_items(app, &[
-                &MenuItem::with_id(app, "abrir", "Abrir Helpert", true, None::<&str>)?,
-                &MenuItem::with_id(app, "salir", "Salir", true, None::<&str>)?,
-            ])?;
             let inicial = if std::path::Path::new(&socket()).exists() { Estado::Disponible } else { Estado::Aviso };
-            let mut tray = TrayIconBuilder::with_id("helpert");
-            if let Some(dir) = carpeta_iconos() {
-                tray = tray.temp_dir_path(dir);
+            // sin barra con bandeja (o sin D-Bus) el icono no aparece: la ventana se abre igual con --abrir
+            let icono = ksni::TrayService::new(Bandeja { estado: inicial, oscuro: oscuro(), app: app.handle().clone() });
+            app.manage(Icono(icono.handle()));
+            icono.spawn();
+            let abrir = std::env::args().any(|a| a == "--abrir");
+            if let Some(w) = app.get_webview_window("chat") {
+                preparar_panel(&w, abrir);
             }
-            tray.icon(Image::from_bytes(png(inicial, oscuro()))?)
-                .tooltip("Helpert · soporte TI")
-                .menu(&menu)
-                .on_menu_event(|app, ev| match ev.id.as_ref() {
-                    "abrir" => mostrar(app),
-                    "salir" => app.exit(0),
-                    _ => {}
-                })
-                .on_tray_icon_event(|tray, ev| {
-                    if let tauri::tray::TrayIconEvent::Click { .. } = ev {
-                        mostrar(tray.app_handle()); // Windows; en Linux el clic abre el menú
-                    }
-                })
-                .build(app)?;
             *app.state::<Actual>().0.lock().unwrap() = inicial;
             let h = app.handle().clone();
             std::thread::spawn(move || {
@@ -286,15 +377,20 @@ fn main() {
                     mostrar(&h); // otra copia (p. ej. desde el menú de aplicaciones) pidió abrir la ventana
                 }
             });
-            if std::env::args().any(|a| a == "--abrir") {
-                mostrar(app.handle());
-            }
             Ok(())
         })
         .on_window_event(|w, ev| match ev {
             WindowEvent::CloseRequested { api, .. } => {
                 api.prevent_close(); // cerrar la ventana deja el icono en la bandeja
                 let _ = w.hide();
+            }
+            WindowEvent::Focused(false) if w.label() == "chat" && !guia::GUIANDO.load(Ordering::Relaxed) && !reciente(&MOSTRADO) => {
+                // como OneDrive: el panel se recoge al hacer clic fuera (no durante una guía en pantalla). Al abrirse,
+                // GTK avisa que ganó y perdió el foco antes de que la capa aparezca (Hyprland): eso no cuenta.
+                if w.is_visible().unwrap_or(false) {
+                    let _ = w.hide();
+                    *RECOGIDO.lock().unwrap() = Some(Instant::now());
+                }
             }
             WindowEvent::Focused(true) => {
                 let app = w.app_handle();
@@ -310,6 +406,18 @@ fn main() {
 
 #[cfg(test)]
 mod pruebas {
+    #[test]
+    fn icono_en_argb_de_red() {
+        // en tres píxeles (una esquina, uno de la marca, la otra esquina) el alfa pasa adelante: RGBA → ARGB
+        let i = super::argb(super::png(super::Estado::Disponible, false));
+        assert_eq!((i.width, i.height, i.data.len()), (64, 64, 64 * 64 * 4));
+        let img = tauri::image::Image::from_bytes(super::png(super::Estado::Disponible, false)).unwrap();
+        for n in [0, 32 * 64 + 20, 64 * 64 - 1] {
+            let (r, a) = (&img.rgba()[n * 4..n * 4 + 4], &i.data[n * 4..n * 4 + 4]);
+            assert_eq!(a, [r[3], r[0], r[1], r[2]]);
+        }
+    }
+
     #[test]
     fn captura_en_carpeta_propia_que_se_borra() {
         use std::os::unix::fs::PermissionsExt;

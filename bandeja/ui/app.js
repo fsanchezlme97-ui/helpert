@@ -408,3 +408,6 @@ $("salir").addEventListener("click", async () => {
 setInterval(revisarAvisos, 30_000);
 revisarAvisos();
 estado();
+
+// Esc recoge el panel, como al hacer clic fuera.
+document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") invoke("recoger").catch(() => {}); });

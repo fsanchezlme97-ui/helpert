@@ -25,6 +25,10 @@ pub struct Geometria {
 /// El último paso con elemento: lo único sobre lo que «Hazlo tú» puede actuar.
 pub struct Ultimo(pub Mutex<Option<(Geometria, [f64; 4], String)>>);
 
+/// Hay una guía en curso: el panel no se oculta al perder el foco (la persona hace clic en otras ventanas y necesita
+/// «Ya lo hice» y «Hazlo tú» a la vista).
+pub static GUIANDO: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 pub const ACCIONES: [&str; 4] = ["clic", "doble_clic", "desplazar_abajo", "desplazar_arriba"];
 
 /// Centro de la caja [x0, y0, x1, y1] (píxeles de la captura) en coordenadas lógicas del escritorio.
@@ -66,11 +70,13 @@ fn capturar_monitor(app: &AppHandle) -> Result<(Vec<u8>, Geometria), String> {
     Ok((datos, Geometria { x: 0.0, y: 0.0, escala }))
 }
 
-/// Capa «overlay» de Wayland (gtk-layer-shell, si está instalada y el escritorio la soporta): la ventana cubre el
-/// monitor por encima de todo, sin foco ni teclado. Se carga en tiempo de ejecución: sin la biblioteca, la bandeja
-/// sigue funcionando y la guía usa una ventana normal siempre encima.
+/// La ventana como capa de Wayland (gtk-layer-shell, si está instalada y el escritorio la soporta). Se carga en tiempo
+/// de ejecución: sin la biblioteca, la bandeja sigue funcionando con ventanas normales (devuelve false).
+/// nivel: 2 sobre las ventanas (TOP), 3 sobre todo (OVERLAY). bordes donde se ancla: 0 izquierda, 1 derecha, 2 arriba,
+/// 3 abajo. zona: 0 se aparta de las barras, -1 las ignora. teclado: 0 nunca, 2 cuando la persona hace clic (ON_DEMAND).
 #[cfg(target_os = "linux")]
-fn capa_superpuesta(w: &tauri::WebviewWindow) -> bool {
+pub fn capa(w: &tauri::WebviewWindow, nivel: i32, bordes: &[i32], margen: i32, zona_exclusiva: i32, modo_teclado: i32,
+            espacio: &std::ffi::CStr) -> bool {
     use gtk::glib::translate::ToGlibPtr;
     use gtk::prelude::*;
     type Ptr = *mut gtk::ffi::GtkWindow;
@@ -83,11 +89,12 @@ fn capa_superpuesta(w: &tauri::WebviewWindow) -> bool {
                 lib.get::<unsafe extern "C" fn(Ptr)>(b"gtk_layer_init_for_window\0")?,
                 lib.get::<unsafe extern "C" fn(Ptr, i32)>(b"gtk_layer_set_layer\0")?,
                 lib.get::<unsafe extern "C" fn(Ptr, i32, i32)>(b"gtk_layer_set_anchor\0")?,
+                lib.get::<unsafe extern "C" fn(Ptr, i32, i32)>(b"gtk_layer_set_margin\0")?,
                 lib.get::<unsafe extern "C" fn(Ptr, i32)>(b"gtk_layer_set_exclusive_zone\0")?,
                 lib.get::<unsafe extern "C" fn(Ptr, i32)>(b"gtk_layer_set_keyboard_mode\0")?,
                 lib.get::<unsafe extern "C" fn(Ptr, *const std::ffi::c_char)>(b"gtk_layer_set_namespace\0")?))
         })();
-        let Ok((soportada, iniciar, capa, ancla, zona, teclado, nombre)) = funciones else { return false };
+        let Ok((soportada, iniciar, capa, ancla, margen_de, zona, teclado, nombre)) = funciones else { return false };
         if soportada() == 0 {
             return false;
         }
@@ -96,13 +103,14 @@ fn capa_superpuesta(w: &tauri::WebviewWindow) -> bool {
         }
         let p: Ptr = ventana.to_glib_none().0;
         iniciar(p);
-        capa(p, 3); // GTK_LAYER_SHELL_LAYER_OVERLAY
-        for borde in 0..4 {
-            ancla(p, borde, 1); // los cuatro bordes: cubre el monitor
+        capa(p, nivel);
+        for &borde in bordes {
+            ancla(p, borde, 1);
+            margen_de(p, borde, margen);
         }
-        zona(p, -1); // no empuja a las demás ventanas
-        teclado(p, 0); // GTK_LAYER_SHELL_KEYBOARD_MODE_NONE
-        nombre(p, c"helpert-guia".as_ptr());
+        zona(p, zona_exclusiva);
+        teclado(p, modo_teclado);
+        nombre(p, espacio.as_ptr());
         std::mem::forget(lib); // las funciones deben seguir cargadas mientras viva la ventana
     }
     true
@@ -125,7 +133,7 @@ fn ventana_guia(app: &AppHandle) -> Result<tauri::WebviewWindow, String> {
         .build()
         .map_err(|e| e.to_string())?;
     #[cfg(target_os = "linux")]
-    let en_capa = capa_superpuesta(&w);
+    let en_capa = capa(&w, 3, &[0, 1, 2, 3], 0, -1, 0, c"helpert-guia"); // cubre el monitor, sin teclado
     #[cfg(not(target_os = "linux"))]
     let en_capa = false;
     if !en_capa {
@@ -154,6 +162,7 @@ pub async fn guia_paso(app: AppHandle, caso_id: i64, hecho: String) -> Value {
     if !matches!(hecho.as_str(), "inicio" | "persona" | "helpert" | "nada") {
         return json!({"error": "Petición no válida"});
     }
+    GUIANDO.store(true, std::sync::atomic::Ordering::Relaxed);
     let a = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         *a.state::<Ultimo>().0.lock().unwrap() = None;
@@ -227,6 +236,7 @@ pub async fn guia_actuar(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 pub fn guia_cerrar(app: AppHandle) {
+    GUIANDO.store(false, std::sync::atomic::Ordering::Relaxed);
     *app.state::<Ultimo>().0.lock().unwrap() = None;
     ocultar(&app);
 }
@@ -237,7 +247,8 @@ pub fn ordenes(accion: &str, x: i32, y: i32, hypr: bool) -> Option<Vec<Vec<Strin
     let (xs, ys) = (x.to_string(), y.to_string());
     if hypr {
         // shortcut: rueda de ydotool en «clics» de rueda; el sentido puede variar según la versión de ydotool
-        let mover = s(&["hyprctl", "dispatch", "movecursor", &xs, &ys]);
+        // Hyprland 0.55+ (config en Lua); las versiones anteriores usan «movecursor X Y» (ver accionar)
+        let mover = s(&["hyprctl", "dispatch", &format!("hl.dsp.cursor.move({{x={x}, y={y}}})")]);
         let accion = match accion {
             "clic" => s(&["ydotool", "click", "0xC0"]),
             "doble_clic" => s(&["ydotool", "click", "-r", "2", "0xC0"]),
@@ -262,9 +273,13 @@ fn accionar(accion: &str, x: i32, y: i32) -> Result<(), String> {
     if !hypr && !x11() {
         return Err("En este escritorio todavía no puedo hacer clic por ti. Hazlo tú y pulsa «Ya lo hice».".into());
     }
+    // hyprctl sale con 0 aunque el dispatch falle: vale solo si responde «ok». Sin mover el cursor no hay clic.
+    let correr = |orden: &[String]| Command::new(&orden[0]).args(&orden[1..]).stderr(Stdio::null()).output()
+        .map(|o| o.status.success() && (orden[0] != "hyprctl" || String::from_utf8_lossy(&o.stdout).trim() == "ok"))
+        .unwrap_or(false);
     for orden in ordenes(accion, x, y, hypr).ok_or("Este paso lo haces tú.")? {
-        let ok = Command::new(&orden[0]).args(&orden[1..]).stdout(Stdio::null()).stderr(Stdio::null())
-            .status().map(|s| s.success()).unwrap_or(false);
+        let ok = correr(&orden)
+            || (orden[0] == "hyprctl" && correr(&["hyprctl", "dispatch", "movecursor", &x.to_string(), &y.to_string()].map(String::from)));
         if !ok {
             return Err(format!("No pude hacer el clic ({} no respondió). Hazlo tú y pulsa «Ya lo hice».", orden[0]));
         }
@@ -289,7 +304,7 @@ mod pruebas {
         assert!(ordenes("escribir", 1, 2, true).is_none() && ordenes("tecla", 1, 2, false).is_none());
         assert_eq!(ordenes("clic", 10, 20, false).unwrap(), vec![vec!["xdotool", "mousemove", "10", "20", "click", "1"]]);
         let h = ordenes("doble_clic", 5, 6, true).unwrap();
-        assert_eq!(h[0], vec!["hyprctl", "dispatch", "movecursor", "5", "6"]);
+        assert_eq!(h[0], vec!["hyprctl", "dispatch", "hl.dsp.cursor.move({x=5, y=6})"]);
         assert_eq!(h[1], vec!["ydotool", "click", "-r", "2", "0xC0"]);
     }
 }

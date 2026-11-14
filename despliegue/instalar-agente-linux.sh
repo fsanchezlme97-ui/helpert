@@ -65,11 +65,11 @@ elif [ -n "${INSCRIPCION_F:-}" ]; then
 fi
 [ -n "${TOKEN:-}" ] || { echo "Falta el token del equipo (--token-archivo o --inscripcion-archivo)."; exit 1; }
 
-# La bandeja necesita WebKitGTK y AppIndicator; se instalan con el gestor de paquetes si faltan.
+# La bandeja necesita WebKitGTK (el icono va por D-Bus, sin AppIndicator); se instala con el gestor de paquetes si faltan.
 if [ -n "$BANDEJA" ] && LANG=C ldd "$BANDEJA" | grep -q 'not found'; then
-  if command -v apt-get >/dev/null; then apt-get install -y libwebkit2gtk-4.1-0 libayatana-appindicator3-1
-  elif command -v dnf >/dev/null; then dnf install -y webkit2gtk4.1 libayatana-appindicator-gtk3
-  elif command -v pacman >/dev/null; then pacman -S --needed --noconfirm webkit2gtk-4.1 libayatana-appindicator
+  if command -v apt-get >/dev/null; then apt-get install -y libwebkit2gtk-4.1-0
+  elif command -v dnf >/dev/null; then dnf install -y webkit2gtk4.1
+  elif command -v pacman >/dev/null; then pacman -S --needed --noconfirm webkit2gtk-4.1
   fi
   ! LANG=C ldd "$BANDEJA" | grep 'not found' || { echo "Faltan bibliotecas para la bandeja (arriba)."; exit 1; }
 fi
