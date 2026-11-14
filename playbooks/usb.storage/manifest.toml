@@ -8,3 +8,4 @@ timeout = 60
 
 [sistemas]
 linux = "linux.sh"
+windows = "windows.ps1"

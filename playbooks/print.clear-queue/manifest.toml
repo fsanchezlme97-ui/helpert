@@ -8,7 +8,7 @@ timeout = 120
 
 [sistemas]
 linux = "linux.sh"
-# windows = "windows.ps1"   pendiente (pruebas en VM)
+windows = "windows.ps1"
 
 [parametros.impresora]
 tipo = "texto"
