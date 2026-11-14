@@ -51,12 +51,9 @@ fn capturar_monitor(app: &AppHandle) -> Result<(Vec<u8>, Geometria), String> {
         if !nombre.chars().all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c)) {
             return Err("Nombre de monitor no válido".into());
         }
-        let dir = std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| std::env::temp_dir().display().to_string());
-        let archivo = std::path::Path::new(&dir).join(format!("helpert-guia-{}.png", std::process::id()));
-        let ok = Command::new("grim").args(["-o", nombre]).arg(&archivo).stdout(Stdio::null()).stderr(Stdio::null())
-            .status().map(|s| s.success()).unwrap_or(false);
-        let datos = std::fs::read(&archivo).unwrap_or_default();
-        let _ = std::fs::remove_file(&archivo);
+        // la imagen sale por la salida estándar: sin archivo temporal que otro usuario pueda cambiar
+        let salida = Command::new("grim").args(["-o", nombre, "-"]).stderr(Stdio::null()).output();
+        let (ok, datos) = salida.map(|s| (s.status.success(), s.stdout)).unwrap_or((false, Vec::new()));
         if !ok || !datos.starts_with(b"\x89PNG") {
             return Err("No pude ver tu pantalla en este escritorio.".into());
         }

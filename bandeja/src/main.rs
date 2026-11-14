@@ -159,8 +159,13 @@ async fn capturar(app: AppHandle) -> Result<tauri::ipc::Response, String> {
 }
 
 fn tomar_captura() -> Result<Vec<u8>, String> {
-    let dir = std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| std::env::temp_dir().display().to_string());
-    let archivo = std::path::Path::new(&dir).join(format!("helpert-captura-{}.png", std::process::id()));
+    // carpeta propia (0700, falla si ya existe): en /tmp nadie puede dejar antes un enlace con ese nombre
+    use std::os::unix::fs::DirBuilderExt;
+    let base = std::env::var("XDG_RUNTIME_DIR").map(std::path::PathBuf::from).unwrap_or_else(|_| std::env::temp_dir());
+    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.subsec_nanos()).unwrap_or(0);
+    let dir = base.join(format!("helpert-captura-{}-{nanos}", std::process::id()));
+    std::fs::DirBuilder::new().mode(0o700).create(&dir).map_err(|_| "No pude preparar la captura.".to_string())?;
+    let archivo = dir.join("captura.png");
     let f = archivo.display().to_string();
     let propia = std::env::var("HELPERT_CAPTURA_CMD").ok(); // pruebas: un programa que deja un PNG en la ruta dada
     let mut intentos: Vec<Vec<String>> = vec![];
@@ -179,9 +184,11 @@ fn tomar_captura() -> Result<Vec<u8>, String> {
         let datos = std::fs::read(&archivo).unwrap_or_default();
         let _ = std::fs::remove_file(&archivo);
         if ok && datos.starts_with(b"\x89PNG\r\n\x1a\n") {
+            let _ = std::fs::remove_dir(&dir);
             return Ok(datos);
         }
     }
+    let _ = std::fs::remove_dir(&dir);
     Err("No pude tomar la captura en este escritorio. Sigue sin ella; el técnico puede pedirla después.".into())
 }
 
@@ -285,6 +292,23 @@ fn main() {
 
 #[cfg(test)]
 mod pruebas {
+    #[test]
+    fn captura_en_carpeta_propia_que_se_borra() {
+        use std::os::unix::fs::PermissionsExt;
+        let base = std::env::temp_dir().join(format!("helpert-prueba-{}", std::process::id()));
+        std::fs::create_dir_all(&base).unwrap();
+        let prog = base.join("capturar.sh");  // deja un PNG mínimo en la ruta y anota la carpeta y sus permisos
+        std::fs::write(&prog, format!("#!/bin/sh\nprintf '\\211PNG\\r\\n\\032\\nx' > \"$1\"\nstat -c %a \"$(dirname \"$1\")\" > {0}/permisos\ndirname \"$1\" > {0}/carpeta\n", base.display())).unwrap();
+        std::fs::set_permissions(&prog, std::fs::Permissions::from_mode(0o755)).unwrap();
+        std::env::set_var("HELPERT_CAPTURA_CMD", &prog);
+        let datos = super::tomar_captura().unwrap();
+        std::env::remove_var("HELPERT_CAPTURA_CMD");
+        assert!(datos.starts_with(b"\x89PNG"));
+        assert_eq!(std::fs::read_to_string(base.join("permisos")).unwrap().trim(), "700");
+        assert!(!std::path::Path::new(std::fs::read_to_string(base.join("carpeta")).unwrap().trim()).exists());
+        std::fs::remove_dir_all(&base).unwrap();
+    }
+
     #[test]
     fn solo_enlaces_de_contacto() {
         assert!(super::url_permitida("https://wa.me/51999888777"));
