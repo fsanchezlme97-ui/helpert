@@ -22,8 +22,18 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: cd server && uv run pytest -q
       - run: cd agente && cargo test -q
+      - name: Archivos de root en la carpeta personal, para que files.home-permissions aplique de verdad
+        run: |
+          sudo mkdir -p ~/helpert-prueba/sub && sudo touch ~/helpert-prueba/sub/b ~/helpert-prueba/-raro ~/helpert-raro
+          sudo ln -s /etc/hosts ~/helpert-prueba/enlace
       - name: Scripts de los playbooks (como root, con aplicar en esta máquina desechable)
         run: python3 playbooks/probar-unix.py --root --aplicar
+      - name: files.home-permissions devolvió todo (y no tocó /etc/hosts)
+        run: |
+          for f in ~/helpert-prueba ~/helpert-prueba/sub ~/helpert-prueba/sub/b ~/helpert-prueba/-raro ~/helpert-raro; do
+            [ "$(stat -c %U "$f")" = "$USER" ] || { echo "sigue sin ser de $USER: $f"; exit 1; }
+          done
+          [ "$(stat -c %U /etc/hosts)" = root ]
 
   macos:  # no hay agente para macOS todavía: aquí solo se prueban los scripts macos.sh (bash 3.2, herramientas BSD)
     runs-on: macos-latest
@@ -32,8 +42,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Archivos de root en la carpeta personal, para que files.home-permissions aplique de verdad
+        run: |
+          sudo mkdir -p ~/helpert-prueba/sub && sudo touch ~/helpert-prueba/sub/b ~/helpert-prueba/-raro ~/helpert-raro
+          sudo ln -s /etc/hosts ~/helpert-prueba/enlace
       - name: Scripts de los playbooks (como root, con aplicar en esta máquina desechable)
         run: python playbooks/probar-unix.py --root --aplicar
+      - name: files.home-permissions devolvió todo (y no tocó /etc/hosts)
+        run: |
+          for f in ~/helpert-prueba ~/helpert-prueba/sub ~/helpert-prueba/sub/b ~/helpert-prueba/-raro ~/helpert-raro; do
+            [ "$(stat -f %Su "$f")" = "$USER" ] || { echo "sigue sin ser de $USER: $f"; exit 1; }
+          done
+          [ "$(stat -f %Su /etc/hosts)" = root ]
 
   windows:
     runs-on: windows-latest

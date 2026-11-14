@@ -75,7 +75,7 @@ aplicar)
   n=$(cuantos)
   [ -x /usr/bin/perl ] || { echo "Falta una herramienta de macOS (perl) para hacerlo con seguridad. Pide a soporte que lo revise."; exit 1; }
   ajenos -type d -execdir /usr/bin/perl -e "$devolver" "$uid" "$(stat -f %d "$casa")" {} + 2>/dev/null
-  ajenos -type f -execdir /usr/bin/sudo -u "$usuario" /bin/sh -c 'cp -p "$1" "$1.helpert-tmp" && mv -f "$1.helpert-tmp" "$1" || rm -f "$1.helpert-tmp"' helpert {} \; 2>/dev/null
+  ajenos -type f -execdir /usr/bin/sudo -u "$usuario" /bin/sh -c 'cp -p -- "$1" "$1.helpert-tmp" && mv -f -- "$1.helpert-tmp" "$1" || rm -f -- "$1.helpert-tmp"' helpert {} \; 2>/dev/null
   q=$(cuantos)
   [ "${q:-0}" -eq 0 ] || { echo "Devolví $((n - q)) archivo(s), pero no pude con $q: pide a soporte que lo revise."; exit 1; }
   echo "Te devolví $n archivo(s) o carpeta(s) de tu carpeta personal. Prueba de nuevo a guardar o cambiar el archivo."
