@@ -157,8 +157,14 @@ def llamar_openai(cfg: dict, mensajes: list[dict]) -> str:
     if var and not clave:  # error de configuración: no se llama al proveedor, se pasa al respaldo
         raise ErrorProveedor(f"falta la clave en la variable de entorno {var}")
     cab = {"Authorization": f"Bearer {clave}"} if clave else {}
-    # shortcut: el formato se pide en las instrucciones, no con response_format (no todos lo aceptan igual); el servidor valida siempre.
-    r = _post(url, {"model": cfg["modelo"], "messages": mensajes, "temperature": 0}, cab, cfg.get("timeout", 60))
+    cuerpo = {"model": cfg["modelo"], "messages": mensajes, "temperature": 0}
+    # shortcut: en openai-compatible genérico el formato va solo en las instrucciones (no todos aceptan response_format igual);
+    # el servidor valida siempre. Los adaptadores que sí lo aceptan (gemini) piden el esquema.
+    if cfg.get("json_schema") and not cfg.get("libre"):
+        cuerpo["response_format"] = {"type": "json_schema", "json_schema": {"name": "contrato", "schema": cfg.get("esquema") or esquema(CATEGORIAS)}}
+    if cfg.get("razonamiento"):
+        cuerpo["reasoning_effort"] = cfg["razonamiento"]
+    r = _post(url, cuerpo, cab, cfg.get("timeout", 60))
     try:
         uso = r.get("usage") or {}
         return respuesta(r["choices"][0]["message"]["content"] or "", uso.get("prompt_tokens"), uso.get("completion_tokens"))
@@ -166,7 +172,16 @@ def llamar_openai(cfg: dict, mensajes: list[dict]) -> str:
         raise ErrorProveedor(f"respuesta inesperada: {str(r)[:200]}") from e
 
 
-PROVEEDORES = {"ollama": llamar_ollama, "openai-compatible": llamar_openai}
+GEMINI = "https://generativelanguage.googleapis.com/v1beta/openai"
+
+
+def llamar_gemini(cfg: dict, mensajes: list[dict]) -> str:
+    """Gemini por su API compatible con OpenAI. Con el esquema el modelo siempre declara la acción (sin él, en la
+    evaluación eligió menos playbooks); razonamiento bajo: responde en ~2 s en vez de 10 a 90."""
+    return llamar_openai({"url": GEMINI, "razonamiento": "low", **cfg, "json_schema": True}, mensajes)
+
+
+PROVEEDORES = {"ollama": llamar_ollama, "openai-compatible": llamar_openai, "gemini": llamar_gemini}
 
 
 def leer_contrato(texto: str, categorias=CATEGORIAS) -> Contrato:

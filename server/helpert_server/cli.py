@@ -25,7 +25,7 @@ def leer_config(ruta: str) -> dict:
     return cfg
 
 
-def evaluar(cfg: dict, casos_ruta: str, indice: int) -> dict:
+def evaluar(cfg: dict, casos_ruta: str, indice: int, pausa: float = 0) -> dict:
     """Corre los casos etiquetados contra UN proveedor de la cadena (sin respaldo) y mide. La cadena, las categorías
     y los playbooks activos son los vigentes (los de la consola), así se evalúa lo que de verdad se usa."""
     db.iniciar(cfg["base_datos"])
@@ -42,6 +42,7 @@ def evaluar(cfg: dict, casos_ruta: str, indice: int) -> dict:
         # «historial»: turnos previos [rol, texto]; se mide lo que recibe la persona en el último (ia.resolver, como la API)
         previos = k.get("historial", [])
         mensajes = [{"role": r, "content": x} for r, x in previos] + [{"role": "user", "content": k["texto"]}]
+        time.sleep(pausa)  # planes gratuitos de API: pocas peticiones por minuto
         t = time.monotonic()
         contrato, modelo, nota, _ = ia.decidir([prov], ia.instrucciones(catalogo, k["so"], aj["categorias"]), mensajes, cats)
         tiempos.append(time.monotonic() - t)
@@ -118,6 +119,7 @@ def main(argv=None):
     s = sub.add_parser("evaluar", help="Mide un proveedor con los casos etiquetados")
     s.add_argument("casos")
     s.add_argument("--proveedor", type=int, default=0, help="Posición en la cadena de la consola (0 = principal)")
+    s.add_argument("--pausa", type=float, default=0, help="Segundos entre casos (planes gratuitos con límite por minuto)")
     a = p.parse_args(argv)
 
     if a.orden == "claves":
@@ -205,4 +207,4 @@ def main(argv=None):
                                "FROM casos ORDER BY id DESC LIMIT 30"):
                 print(" · ".join(str(v) for v in dict(f).values()))
     elif a.orden == "evaluar":
-        print(json.dumps(evaluar(cfg, a.casos, a.proveedor), ensure_ascii=False, indent=2))
+        print(json.dumps(evaluar(cfg, a.casos, a.proveedor, a.pausa), ensure_ascii=False, indent=2))

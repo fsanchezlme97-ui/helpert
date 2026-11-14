@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 METAS = {"sin_humano": 50.0, "minutos": 10.0, "satisfaccion": 4.3, "reapertura": 10.0, "revertidas": 2.0}
 RANGO_METAS = {"sin_humano": (0, 100), "minutos": (1, 240), "satisfaccion": (1, 5), "reapertura": (0, 100),
                "revertidas": (0, 100)}
-PROVEEDORES = ("openai-compatible", "ollama")
+PROVEEDORES = ("gemini", "openai-compatible", "ollama")
 # Las claves de API viven en variables de entorno del servidor; la consola solo elige cuál, y solo de este prefijo.
 # Si fuera texto libre, una sesión robada podría mandar HELPERT_DB (con la contraseña de la base) a su propio servidor.
 CLAVE_ENV = re.compile(r"^HELPERT_IA_[A-Z0-9_]{1,40}$")
