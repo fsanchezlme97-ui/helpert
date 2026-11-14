@@ -302,12 +302,16 @@ fn comando(script: &str, id: &str, paso: &str) -> Command {
 
 /// Windows: PowerShell 5.1 con el script en -EncodedCommand (los bytes verificados, sin archivo que se pueda
 /// cambiar en medio) y salida en UTF-8. El paso va en HP_PASO. Del entorno del servicio solo pasa lo que
-/// PowerShell y los comandos del sistema necesitan.
+/// PowerShell y los comandos del sistema necesitan. TEMP es una carpeta del servicio (ProgramData\Helpert\tmp,
+/// que el instalador deja solo para SYSTEM y administradores), no C:\Windows\Temp, donde cualquier usuario puede
+/// dejar enlaces con los nombres que un script vaya a usar.
 #[cfg(windows)]
 fn comando(script: &str, _id: &str, _paso: &str) -> Command {
     use std::os::windows::process::CommandExt;
     let raiz = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
     let fuente = format!("$ProgressPreference = 'SilentlyContinue'\n[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false\n$OutputEncoding = [Console]::OutputEncoding\n{script}");
+    let tmp = format!(r"{}\Helpert\tmp", std::env::var("ProgramData").unwrap_or_else(|_| r"C:\ProgramData".into()));
+    let _ = std::fs::create_dir_all(&tmp);
     let utf16: Vec<u8> = fuente.encode_utf16().flat_map(u16::to_le_bytes).collect();
     let mut cmd = Command::new(format!(r"{raiz}\System32\WindowsPowerShell\v1.0\powershell.exe"));
     cmd.args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", &base64(&utf16)])
@@ -317,8 +321,8 @@ fn comando(script: &str, _id: &str, _paso: &str) -> Command {
                "PROCESSOR_ARCHITECTURE", "OS", "ALLUSERSPROFILE", "PUBLIC"]
             .into_iter().filter_map(|k| std::env::var(k).ok().map(|v| (k, v))))
         .env("PATH", format!(r"{raiz}\System32;{raiz};{raiz}\System32\Wbem;{raiz}\System32\WindowsPowerShell\v1.0\"))
-        .env("TEMP", format!(r"{raiz}\Temp"))
-        .env("TMP", format!(r"{raiz}\Temp"))
+        .env("TEMP", &tmp)
+        .env("TMP", &tmp)
         .current_dir(&raiz)
         .creation_flags(0x0800_0000); // CREATE_NO_WINDOW
     cmd

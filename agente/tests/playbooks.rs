@@ -49,8 +49,8 @@ fn firma_de_python_valida_y_ejecucion_completa() {
     let (archivo, ruta) = (PathBuf::from(format!("/tmp/helpert-prueba-{nombre}")), "/usr/local/sbin:".to_string());
     #[cfg(windows)]
     let (archivo, ruta) = {
-        let raiz = std::env::var("SystemRoot").unwrap();
-        (PathBuf::from(format!(r"{raiz}\Temp\helpert-prueba-{nombre}")), format!(r"{raiz}\System32;"))
+        let (raiz, datos) = (std::env::var("SystemRoot").unwrap(), std::env::var("ProgramData").unwrap());
+        (PathBuf::from(format!(r"{datos}\Helpert\tmp\helpert-prueba-{nombre}")), format!(r"{raiz}\System32;"))
     };
     let d = ejecutar(&p, SO, "diagnosticar", &env, "ana");
     assert_eq!(d.codigo, 0, "{d:?}");

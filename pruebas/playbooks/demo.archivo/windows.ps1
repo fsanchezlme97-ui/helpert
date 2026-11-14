@@ -1,4 +1,4 @@
-# Playbook inofensivo para las pruebas: crea y borra un archivo en la carpeta temporal del sistema.
+# Playbook inofensivo para las pruebas: crea y borra un archivo en la carpeta temporal del agente.
 $f = Join-Path $env:TEMP "helpert-prueba-$env:HP_NOMBRE"
 switch ($env:HP_PASO) {
     'diagnosticar' { "Se creará $f."; exit 0 }
