@@ -309,12 +309,13 @@ fn comando(script: &str, id: &str, paso: &str) -> Command {
 fn comando(script: &str, _id: &str, _paso: &str) -> Command {
     use std::os::windows::process::CommandExt;
     let raiz = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
-    let fuente = format!("$ProgressPreference = 'SilentlyContinue'\n[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false\n$OutputEncoding = [Console]::OutputEncoding\n{script}");
+    let fuente = format!("$ProgressPreference = 'SilentlyContinue'\n[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)\n$OutputEncoding = [Console]::OutputEncoding\n{script}");
     let datos = format!(r"{}\Helpert", std::env::var("ProgramData").unwrap_or_else(|_| r"C:\ProgramData".into()));
     let tmp = format!(r"{datos}\tmp");
     let _ = std::fs::create_dir_all(&tmp);
-    // Sin caché propia, PowerShell 5.1 vuelve a analizar todos los módulos instalados en cada arranque (11-23 s en la
-    // CI): la caché vive en la carpeta del agente, que hereda los permisos de solo SYSTEM y administradores.
+    // Caché de módulos propia (en la carpeta del agente, solo SYSTEM y administradores): sin una completa, PowerShell 5.1
+    // vuelve a recorrer los módulos cada vez que un script usa un cmdlet no cargado (18-28 s en la CI). La completa la
+    // arma preparar_powershell; por eso la cabecera no usa cmdlets.
     let cache = format!(r"{datos}\powershell");
     let _ = std::fs::create_dir_all(&cache);
     let utf16: Vec<u8> = fuente.encode_utf16().flat_map(u16::to_le_bytes).collect();
@@ -334,20 +335,35 @@ fn comando(script: &str, _id: &str, _paso: &str) -> Command {
     cmd
 }
 
-/// Arranca PowerShell una vez, como un paso de playbook, para que deje su caché de módulos: así el primer playbook
-/// de un equipo nuevo no se pasa del tiempo límite. Espera a que termine (como mucho 2 minutos).
+/// Si aún no existe, arma la caché completa de módulos de PowerShell (lista todos los módulos y sus comandos), como
+/// el servicio al arrancar: con ella un script tarda décimas en vez de 18-28 s, y el primer playbook de un equipo
+/// nuevo no se pasa del tiempo límite. Espera a que termine (como mucho 10 minutos; en la CI, con 54 módulos, ~2).
 #[cfg(windows)]
 pub fn preparar_powershell() {
-    let mut cmd = comando("exit 0", "preparar", "preparar");
+    let datos = format!(r"{}\Helpert", std::env::var("ProgramData").unwrap_or_else(|_| r"C:\ProgramData".into()));
+    // marca propia: un playbook que corrió antes deja una caché parcial, que no sirve
+    let lista = format!(r"{datos}\powershell\completa");
+    if Path::new(&lista).exists() {
+        return;
+    }
+    let mut cmd = comando("$null = Get-Module -ListAvailable -Refresh; $null = Get-Command -CommandType Cmdlet, Function",
+                          "preparar", "preparar");
     cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
     if let Ok(mut hijo) = cmd.spawn() {
         let grupo = Grupo::de(&hijo);
-        let limite = Instant::now() + Duration::from_secs(120);
-        while matches!(hijo.try_wait(), Ok(None)) && Instant::now() < limite {
-            std::thread::sleep(Duration::from_millis(200));
-        }
+        let limite = Instant::now() + Duration::from_secs(600);
+        let ok = loop {
+            match hijo.try_wait() {
+                Ok(Some(st)) => break st.success(),
+                Ok(None) if Instant::now() < limite => std::thread::sleep(Duration::from_millis(200)),
+                _ => break false,
+            }
+        };
         grupo.matar();
         let _ = hijo.wait();
+        if ok {
+            let _ = fs::write(&lista, b"");
+        }
     }
 }
 
