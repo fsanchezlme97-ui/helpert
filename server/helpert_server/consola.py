@@ -1,4 +1,4 @@
-"""Consola web del Analista N2: casos, detalle y métricas. Solo lectura en esta versión.
+"""Consola web de soporte: casos, atención física, métricas y administración, con una vista de inicio por rol.
 
 Interfaz: tema de shadcn/ui sobre Tailwind (web/tema.css), DataTables, Choices.js y ECharts, todo servido desde
 /consola/estatico (sin CDN). Las páginas se arman en el servidor y funcionan sin JavaScript; el JavaScript
@@ -32,6 +32,9 @@ from urllib.parse import parse_qs, urlencode
 from zoneinfo import ZoneInfo, available_timezones
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
@@ -95,7 +98,8 @@ ROLES = {"admin": "Administración (plataforma)", "admin_empresa": "Administraci
          "analista": "Analista N3", "tecnico": "Asistente N2 (en sitio)", "gerencia": "Gerencia"}
 JEFES = ("admin", "admin_empresa", "analista")  # asignan visitas, ven capturas, pasan casos entre niveles
 SOPORTE = (*JEFES, "tecnico")
-NIVEL = {1: ("N1 · Helpert", "info"), 2: ("N2 · Soporte", "alerta"), 3: ("N3 · Analista", "peligro")}
+INICIO = {"tecnico": "/consola/visitas", "gerencia": "/consola/metricas"}  # a dónde llega cada rol al entrar (si no, Casos)
+NIVEL = {1:("N1 · Helpert", "info"), 2: ("N2 · Soporte", "alerta"), 3: ("N3 · Analista", "peligro")}
 
 # Estado del caso → (texto, variante de insignia). Los colores son los del casco del logo.
 ESTADO_CASO = {
@@ -132,6 +136,17 @@ def estado_caso(estado: str, resuelto=None) -> str:
     return insignia(texto, variante)
 
 
+def sistema(so) -> str:
+    """Sistema operativo del equipo, como lo lee una persona (el agente informa «linux» o «windows»)."""
+    return {"linux": "Linux", "windows": "Windows", "macos": "macOS"}.get(str(so or "").lower(), str(so or "").capitalize())
+
+
+def duracion(segundos: float) -> str:
+    """«12 min», «3 h», «2 d»: para «hace…» y «vence en…»."""
+    m = int(abs(segundos) // 60)
+    return "menos de 1 min" if m < 1 else f"{m} min" if m < 60 else f"{m // 60} h" if m < 48 * 60 else f"{m // 1440} d"
+
+
 def codigo_paso(codigo) -> str:
     """Código de salida de un paso de playbook (contrato del plan) como insignia."""
     if codigo is None:
@@ -152,9 +167,9 @@ def cifra(titulo: str, valor: str, nota: str, icono_: str, clase_valor: str = ""
     if compacta:
         return (f'<div class="tarjeta flex-row items-center gap-3 px-4 py-3"><span class="flex size-9 shrink-0 items-center '
                 f'justify-center rounded-md bg-muted text-muted-foreground">{icono(icono_)}</span><div class="min-w-0">'
-                f'<p class="flex items-baseline gap-2"><span class="text-2xl font-semibold tabular-nums tracking-tight {clase_valor}">'
-                f'{valor}</span><span class="truncate text-sm font-medium text-muted-foreground">{titulo}</span></p>'
-                f'<p class="truncate text-xs text-muted-foreground">{nota}</p></div></div>')
+                f'<p class="flex flex-wrap items-baseline gap-x-2"><span class="text-2xl font-semibold tabular-nums tracking-tight {clase_valor}">'
+                f'{valor}</span><span class="text-sm font-medium text-muted-foreground">{titulo}</span></p>'
+                f'<p class="text-xs text-muted-foreground">{nota}</p></div></div>')
     return (f'<div class="tarjeta gap-3 py-5"><div class="flex items-center justify-between px-5">'
             f'<span class="text-sm font-medium text-muted-foreground">{titulo}</span>'
             f'<span class="text-muted-foreground">{icono(icono_)}</span></div>'
@@ -210,6 +225,35 @@ def montar(app: FastAPI, cfg: dict) -> None:
             f'</head><body{f" data-refrescar={refrescar}" if refrescar else ""}>{cuerpo_html}</body></html>',
             status_code=estado, headers=CABECERAS)
 
+    def pagina_error(estado, mensaje):
+        titulo = {403: "Sin acceso", 404: "No encontrado", 409: "El caso ya cambió", 422: "Revisa los datos",
+                  429: "Demasiados intentos"}.get(estado, "Algo salió mal")
+        cuerpo = (
+            '<div class="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted/50 p-6 md:p-10">'
+            f'<div class="flex w-full max-w-md flex-col gap-6"><div class="flex justify-center">{logo("size-11", "Helpert")}</div>'
+            '<div class="tarjeta" role="alert"><div class="tarjeta-cab text-center">'
+            f'<p class="text-sm font-medium text-muted-foreground">Error {estado}</p><h1 class="text-xl font-semibold">{titulo}</h1>'
+            f'<p class="tarjeta-desc">{e(mensaje)}</p></div><div class="tarjeta-cuerpo flex flex-wrap justify-center gap-2">'
+            f'<a class="btn btn-primario" href="/consola">{icono("atras")}Volver a la consola</a></div></div></div></div>')
+        return pagina(titulo, cuerpo, estado=estado)
+
+    # Errores de la consola como página (no JSON); la API de los agentes (/v1) y las redirecciones siguen igual.
+    INGLES = {"Not Found": "Esa página no existe o no está en tu empresa.",
+              "Method Not Allowed": "Esa acción no se hace desde aquí: vuelve a la página y usa sus botones."}
+
+    @app.exception_handler(StarletteHTTPException)
+    async def error_consola(request: Request, exc: StarletteHTTPException):
+        ruta = request.url.path
+        if exc.status_code < 400 or not ruta.startswith("/consola") or ruta.startswith(E + "/"):
+            return await http_exception_handler(request, exc)
+        return pagina_error(exc.status_code, INGLES.get(str(exc.detail), str(exc.detail)))
+
+    @app.exception_handler(RequestValidationError)
+    async def error_validacion(request: Request, exc: RequestValidationError):
+        if not request.url.path.startswith("/consola"):
+            return await request_validation_exception_handler(request, exc)
+        return pagina_error(422, "La dirección tiene un dato que no es válido (p. ej. un número de caso con letras).")
+
     def emergencia(persona):
         """Aviso en todas las páginas mientras haya un interruptor de emergencia activo."""
         a = aj()
@@ -236,25 +280,30 @@ def montar(app: FastAPI, cfg: dict) -> None:
         escalados = 0
         pendientes = 0
         if persona["rol"] != "gerencia":
-            enlaces.insert(0, ("casos", "/consola", "Casos"))
-            enlaces.insert(1, ("visitas", "/consola/visitas", "Atención física"))
+            tecnico = persona["rol"] == "tecnico"  # su trabajo (visitas y casos N2) va primero: «Mi día»
+            enlaces[:0] = ([("visitas", "/consola/visitas", "Mi día"), ("casos", "/consola", "Casos")] if tecnico else
+                           [("casos", "/consola", "Casos"), ("visitas", "/consola/visitas", "Atención física")])
             with db.conexion(dsn) as c:
                 escalados = c.execute(f"SELECT count(*) AS n FROM casos WHERE estado = 'escalado' AND {alc(persona, 'empresa_id')}"
                                       ).fetchone()["n"]
                 pendientes = c.execute(f"SELECT count(*) AS n FROM visitas v JOIN casos k ON k.id = v.caso_id WHERE "
-                                       f"{alc(persona, 'k.empresa_id')} AND (v.estado = 'pendiente' OR "
-                                       "(v.estado = 'asignada' AND v.tecnico_id = %s))", (persona["id"],)).fetchone()["n"]
+                                       f"{alc(persona, 'k.empresa_id')} AND ((v.estado = 'pendiente' AND %s) OR "
+                                       "(v.estado = 'asignada' AND v.tecnico_id = %s))",
+                                       (not tecnico, persona["id"])).fetchone()["n"]  # el técnico no ve las por asignar
 
         def enlace(k, u, t, movil=False, ic=None):
-            n, titulo_n = {"casos": (escalados, "Casos escalados"), "visitas": (pendientes, "Visitas por asignar o tuyas")}.get(k, (0, ""))
+            n, titulo_n = {"casos": (escalados, "Casos escalados"),
+                           "visitas": (pendientes, "Tus visitas por atender" if persona["rol"] == "tecnico"
+                                       else "Visitas por asignar o tuyas")}.get(k, (0, ""))
             extra = (f'<span class="ml-auto rounded-full bg-peligro/15 px-1.5 py-px text-xs font-medium tabular-nums '
-                     f'text-peligro" title="{titulo_n}">{n}</span>' if n and not movil else "")
+                     f'text-peligro" title="{titulo_n}"><span class="sr-only">{titulo_n}: </span>{n}</span>' if n and not movil else "")
             clase = ("inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-muted-foreground "
-                     "hover:bg-accent hover:text-foreground aria-[current=page]:bg-accent aria-[current=page]:text-foreground"
+                     "hover:bg-accent hover:text-foreground aria-[current=page]:bg-accent aria-[current=page]:text-foreground "
+                     "outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                      if movil else
                      "flex h-9 items-center gap-2.5 rounded-md px-2.5 text-sm font-medium text-muted-foreground transition-colors "
                      "hover:bg-sidebar-accent hover:text-foreground aria-[current=page]:bg-primario-suave "
-                     "aria-[current=page]:text-sobre-primario-suave")
+                     "aria-[current=page]:text-sobre-primario-suave outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50")
             t = {"admin": "Admin", "visitas": "Visitas"}.get(k, t) if movil else t  # en el menú del móvil no caben los largos
             actual_ = k == actual or (movil and k == "admin" and actual.startswith("admin"))
             return f'<a href="{u}" class="{clase} shrink-0"{" aria-current=page" if actual_ else ""}>{icono(ic or k)}{t}{extra}</a>'
@@ -295,8 +344,11 @@ def montar(app: FastAPI, cfg: dict) -> None:
             '<div class="hidden items-center gap-2 text-sm md:flex"><span class="text-muted-foreground">Consola</span>'
             f'<span class="text-muted-foreground/60">/</span><span class="font-medium">{e(titulo)}</span></div>'
             f'<div class="ml-auto md:hidden">{salir}</div></header>')
-        return (f'<div class="flex min-h-svh">{lateral}<div class="flex min-w-0 flex-1 flex-col">{cabecera}'
-                f'<main class="mx-auto w-full max-w-[112rem] flex-1 space-y-6 p-4 md:p-6 lg:p-8">{emergencia(persona)}{cuerpo}</main></div></div>')
+        saltar = ('<a href="#contenido" class="sr-only z-50 rounded-md bg-background px-3 py-2 text-sm font-medium shadow '
+                  'focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:ring-[3px] focus:ring-ring/50">Saltar al contenido</a>')
+        return (f'{saltar}<div class="flex min-h-svh">{lateral}<div class="flex min-w-0 flex-1 flex-col">{cabecera}'
+                f'<main id="contenido" tabindex="-1" class="mx-auto w-full max-w-[112rem] flex-1 space-y-6 p-4 outline-none '
+                f'md:p-6 lg:p-8">{emergencia(persona)}{cuerpo}</main></div></div>')
 
     def persona_de(request: Request, *roles):
         token = request.cookies.get(COOKIE, "")
@@ -319,7 +371,7 @@ def montar(app: FastAPI, cfg: dict) -> None:
 
     def de_alcance(c, p, caso_id):
         """El caso, solo si está en el alcance de la persona; si no, 404 (no se revela que existe)."""
-        k = c.execute(f"SELECT k.*, q.nombre AS equipo, q.remoto, q.sede AS equipo_sede, q.area, q.piso, "
+        k = c.execute(f"SELECT k.*, q.nombre AS equipo, q.so AS equipo_so, q.remoto, q.sede AS equipo_sede, q.area, q.piso, "
                       f"e.nombre AS empresa, e.sla_n2_min, e.sla_n3_min, pe.email AS persona_email, pe.nombre AS persona_nombre, "
                       f"pe.telefono AS persona_telefono, pe.sede AS persona_sede, u.nombre AS asignado, u.email AS asignado_email "
                       f"FROM casos k JOIN equipos q ON q.id = k.equipo_id LEFT JOIN empresas e ON e.id = k.empresa_id "
@@ -333,14 +385,58 @@ def montar(app: FastAPI, cfg: dict) -> None:
         """Empresas que la persona puede elegir en los filtros (las de la plataforma: todas)."""
         return c.execute(f"SELECT id, nombre FROM empresas WHERE {alc(p, 'id')} ORDER BY nombre").fetchall()
 
+    def cola_escalados(c, p, nivel=None):
+        """Casos escalados del alcance, primero el que vence antes (antigüedad según el tiempo de respuesta de su nivel);
+        a igual plazo, la visita de mayor prioridad. nivel: solo ese nivel (el técnico ve la cola de N2)."""
+        return c.execute(f"""
+            SELECT k.id, k.nivel, k.escalado, k.categoria, k.subcategoria, k.nota, k.asignado_id, q.nombre AS equipo, q.so,
+              em.nombre AS empresa, coalesce(pe.nombre, pe.email, k.usuario) AS persona, coalesce(u.nombre, u.email) AS asignado,
+              v.estado AS visita, v.prioridad,
+              coalesce(k.escalado, k.creado) + make_interval(mins => CASE WHEN k.nivel >= 3 THEN coalesce(em.sla_n3_min, 1440)
+                                                                     ELSE coalesce(em.sla_n2_min, 240) END) AS vence
+            FROM casos k JOIN equipos q ON q.id = k.equipo_id LEFT JOIN empresas em ON em.id = k.empresa_id
+            LEFT JOIN personas pe ON pe.id = k.persona_id LEFT JOIN usuarios_consola u ON u.id = k.asignado_id
+            LEFT JOIN visitas v ON v.caso_id = k.id
+            WHERE k.estado = 'escalado' AND {alc(p, 'k.empresa_id')} AND (%(n)s = 0 OR k.nivel = %(n)s)
+            ORDER BY vence, CASE v.prioridad WHEN 'alta' THEN 0 WHEN 'media' THEN 1 ELSE 2 END, k.id
+            LIMIT 100""", {"n": nivel or 0}).fetchall()
+
+    def lista_cola(p, filas, vacio_txt):
+        """La cola como lista (se lee bien en el móvil): qué, de quién, desde cuándo y cuánto queda."""
+        if not filas:
+            return (f'<p class="flex items-center gap-2 px-6 py-6 text-sm text-muted-foreground">'
+                    f'{icono("ok", "size-4 text-exito")}{vacio_txt}</p>')
+        ahora = db.ahora()
+
+        def fila(k):
+            resta = (k["vence"] - ahora).total_seconds()
+            plazo = (insignia(f"Vencido hace {duracion(resta)}", "peligro", "reloj") if resta < 0 else
+                     insignia(f"Vence en {duracion(resta)}", "alerta" if resta < 3600 else "neutra", "reloj"))
+            quien = (insignia("Sin tomar", "borde") if not k["asignado_id"] else
+                     insignia("Tuyo", "info", "usuario") if k["asignado_id"] == p["id"] else insignia(k["asignado"], "neutra", "usuario"))
+            visita = insignia(f"Visita {VISITA[k['visita']][0].lower()}", "neutra", "visitas") if k["visita"] in ("pendiente", "asignada") else ""
+            return (f'<li class="relative grid gap-1.5 px-6 py-3 hover:bg-muted/50">'
+                    f'<div class="flex flex-wrap items-center gap-2"><a class="font-medium after:absolute after:inset-0 '
+                    f'focus-visible:underline" href="/consola/caso/{k["id"]}">Caso #{k["id"]}</a>{insignia(*NIVEL[k["nivel"]])}'
+                    f'<span class="text-sm">{e(k["categoria"] or "Sin clasificar")}'
+                    + (f' <span class="text-muted-foreground">· {e(k["subcategoria"])}</span>' if k["subcategoria"] else "")
+                    + f'</span><span class="ml-auto flex flex-wrap gap-1.5">{plazo}{quien}{visita}</span></div>'
+                    f'<p class="text-xs text-muted-foreground">{e(k["persona"])} · {e(k["equipo"])} ({e(sistema(k["so"]) or "—")})'
+                    + (f' · {e(k["empresa"])}' if p["empresa_id"] is None else "")
+                    + f' · escalado hace {duracion((ahora - (k["escalado"] or ahora)).total_seconds())}'
+                    + (f' · <span class="text-foreground/80">Nota de Helpert: {e(k["nota"])}</span>' if k["nota"] else "")
+                    + '</p></li>')
+        return f'<ol class="divide-y">{"".join(fila(k) for k in filas)}</ol>'
+
     def crear_sesion(usuario_id: int, request: Request) -> Response:
         token = secrets.token_urlsafe(32)
         with db.conexion(dsn) as c:
             c.execute("DELETE FROM sesiones WHERE expira < now()")
             c.execute("INSERT INTO sesiones (token_sha, usuario_id, expira) VALUES (%s, %s, %s)",
                       (db.sha(token), usuario_id, db.ahora() + timedelta(hours=aj()["sesion_horas"])))
-            c.execute("UPDATE usuarios_consola SET ultimo_acceso = now() WHERE id = %s", (usuario_id,))
-        r = RedirectResponse("/consola", 303)
+            rol = c.execute("UPDATE usuarios_consola SET ultimo_acceso = now() WHERE id = %s RETURNING rol",
+                            (usuario_id,)).fetchone()["rol"]
+        r = RedirectResponse(INICIO.get(rol, "/consola"), 303)
         r.set_cookie(COOKIE, token, max_age=aj()["sesion_horas"] * 3600, httponly=True, samesite="strict",
                      secure=request.url.scheme == "https", path="/")
         return r
@@ -366,8 +462,8 @@ def montar(app: FastAPI, cfg: dict) -> None:
             '<div class="grid gap-2"><label class="etiqueta" for="clave">Contraseña</label>'
             '<input class="campo" id="clave" name="clave" type="password" autocomplete="current-password" required></div>'
             '<button class="btn btn-primario w-full">Entrar</button></form></div></div>'
-            '<p class="text-balance text-center text-xs text-muted-foreground">Acceso para analistas N2, técnicos y '
-            'gerencia. Las sesiones duran 12 horas.</p></div></div>')
+            '<p class="text-balance text-center text-xs text-muted-foreground">Acceso para administración, analistas, técnicos y '
+            'gerencia.</p></div></div>')
 
     @app.get("/consola/login", include_in_schema=False)
     def login_get():
@@ -413,7 +509,8 @@ def montar(app: FastAPI, cfg: dict) -> None:
         extra += " AND EXISTS (SELECT 1 FROM capturas x WHERE x.caso_id = k.id AND x.acepta)" if captura else ""
         params = {"e": estado, "emp": empresa, "niv": nivel}
         with db.conexion(dsn) as c:
-            filas = c.execute(f"SELECT k.*, q.nombre AS equipo, em.nombre AS empresa, pe.email AS persona_email "
+            cola = cola_escalados(c, p)
+            filas = c.execute(f"SELECT k.*, q.nombre AS equipo, q.so AS equipo_so, em.nombre AS empresa, pe.email AS persona_email "
                               f"FROM casos k JOIN equipos q ON q.id = k.equipo_id LEFT JOIN empresas em ON em.id = k.empresa_id "
                               f"LEFT JOIN personas pe ON pe.id = k.persona_id "
                               f"WHERE {filtro} AND {extra} ORDER BY k.id DESC LIMIT 500", params).fetchall()
@@ -427,7 +524,7 @@ def montar(app: FastAPI, cfg: dict) -> None:
         actuales = {k: v for k, v in (("empresa", empresa), ("nivel", nivel), ("captura", captura)) if v}
 
         cifras = ('<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">'
-                  + cifra("Abiertos", str(cuenta["abiertos"]), "Conversando o esperando al usuario", "mensaje", compacta=True)
+                  + cifra("Abiertos", str(cuenta["abiertos"]), "Con Helpert (N1): conversando o esperando a la persona", "mensaje", compacta=True)
                   + cifra("Escalados", str(cuenta["escalado"]), "Esperan a soporte (N2 o N3)", "escalar",
                           "text-peligro" if cuenta["escalado"] else "", compacta=True)
                   + cifra("Cerrados en 24 h", str(cuenta["cerrados_24h"]), "Resueltos o cerrados por el usuario", "ok", compacta=True)
@@ -468,20 +565,23 @@ def montar(app: FastAPI, cfg: dict) -> None:
                 f'<tr data-href="/consola/caso/{f["id"]}">'
                 f'<td data-order="{f["id"]}"><a class="font-medium underline-offset-4 hover:underline" href="/consola/caso/{f["id"]}">#{f["id"]}</a></td>'
                 f'<td data-order="{f["creado"].isoformat()}" class="whitespace-nowrap tabular-nums text-muted-foreground">{fecha(f["creado"])}</td>'
-                f'<td><span class="inline-flex items-center gap-1.5 whitespace-nowrap">{icono("equipo", "size-3.5 text-muted-foreground")}{e(f["equipo"])}</span></td>'
+                f'<td><span class="inline-flex items-center gap-1.5 whitespace-nowrap">{icono("equipo", "size-3.5 text-muted-foreground")}{e(f["equipo"])}</span>'
+                f'<span class="block pl-5 text-xs text-muted-foreground">{e(sistema(f["equipo_so"] or f["so"]))}</span></td>'
                 + (f'<td class="whitespace-nowrap text-muted-foreground">{e(f["empresa"])}</td>' if plataforma else "")
-                + f'<td class="max-w-60 truncate" title="{e(f["persona_email"] or f["usuario"])}">{e(f["persona_email"] or f["usuario"])}</td>'
+                + f'<td class="max-w-40 truncate 2xl:max-w-60" title="{e(f["persona_email"] or f["usuario"])}">{e(f["persona_email"] or f["usuario"])}</td>'
                 f'<td data-search="{e(ESTADO_CASO.get(f["estado"], (f["estado"],))[0])}"><div class="flex flex-nowrap gap-1">'
                 f'{estado_caso(f["estado"], f["resuelto"])}{insignia(*NIVEL[f["nivel"]]) if f["nivel"] > 1 else ""}</div></td>'
-                f'<td data-search="{e(categoria)}"><div class="max-w-64 truncate 2xl:max-w-80" title="{e(categoria)}'
+                f'<td data-search="{e(categoria)}"><div class="max-w-48 truncate 2xl:max-w-80" title="{e(categoria)}'
                 + (f' · {e(f["subcategoria"])}' if f["subcategoria"] else "") + f'"><span class="font-medium">{e(categoria)}</span>'
                 + (f' <span class="text-muted-foreground">· {e(f["subcategoria"])}</span>' if f["subcategoria"] else "") + '</div></td>'
                 f'<td>{f"<span class=\"codigo\">{e(f["playbook"])}</span>" if f["playbook"] else "<span class=\"text-muted-foreground\">—</span>"}</td>'
-                f'<td class="whitespace-nowrap text-xs text-muted-foreground">{e(f["modelo"])}</td>'
+                f'<td class="hidden whitespace-nowrap text-xs text-muted-foreground 2xl:table-cell">{e(f["modelo"])}</td>'
                 f'<td data-order="{f["calificacion"] or 0}">{nota}</td></tr>')
 
-        cab = "".join(f"<th>{t}</th>" for t in ("Caso", "Abierto", "Equipo", *(("Empresa",) if plataforma else ()), "Persona",
-                                                  "Estado", "Categoría", "Playbook", "Modelo", "Nota"))
+        # «Modelo» solo en pantallas muy anchas: a 1440 px la tabla entra sin desplazarse (el modelo está en el caso y en Métricas)
+        cab = "".join('<th class="hidden 2xl:table-cell">Modelo</th>' if t == "Modelo" else f"<th>{t}</th>"
+                      for t in ("Caso", "Abierto", "Equipo", *(("Empresa",) if plataforma else ()), "Persona",
+                                "Estado", "Categoría", "Playbook", "Modelo", "Nota"))
         if filas:
             tabla = (f'<div class="tabla-caja"><table id="tabla-casos" class="tabla" data-tabla="completa">'
                      f'<thead><tr>{cab}</tr></thead><tbody>{"".join(fila(f) for f in filas)}</tbody></table></div>')
@@ -489,11 +589,20 @@ def montar(app: FastAPI, cfg: dict) -> None:
             tabla = (f'<div class="flex flex-col items-center gap-2 px-6 py-16 text-center">'
                      f'<span class="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">{icono("casos", "size-5")}</span>'
                      f'<p class="font-medium">No hay casos {ESTADOS[estado].lower() if estado != "todos" else ""}</p>'
-                     '<p class="text-sm text-muted-foreground">Cuando un equipo pida ayuda, el caso aparece aquí.</p></div>')
+                     + ('<p class="text-sm text-muted-foreground">Con estos filtros no hay nada. <a class="underline" href="/consola?'
+                        + urlencode({"estado": estado}) + '">Quitar filtros</a></p>' if actuales else
+                        '<p class="text-sm text-muted-foreground">Cuando un equipo pida ayuda, el caso aparece aquí.</p>') + '</div>')
         tarjeta_tabla = (f'<div class="tarjeta gap-0 overflow-hidden py-0"><div class="flex flex-wrap items-center gap-3 border-b p-3">'
                          f'{pestanas}{filtros}<div class="ml-auto">{herramientas}</div></div>{tabla}</div>')
+        tarjeta_cola = (
+            f'<section class="tarjeta gap-0 overflow-hidden py-0" aria-labelledby="t-cola"><div class="flex flex-wrap items-center '
+            f'justify-between gap-3 border-b px-6 py-4"><div class="space-y-1"><h2 id="t-cola" class="tarjeta-titulo">'
+            f'Cola de escalados</h2><p class="tarjeta-desc">Lo que Helpert (N1) no resolvió. Primero lo que vence antes, según el '
+            f'tiempo de respuesta de su nivel; a igual plazo, la visita de mayor prioridad.</p></div>'
+            + (f'<a class="btn btn-borde btn-sm" href="/consola?estado=escalado">Ver los {len(cola)} en la tabla</a>' if len(cola) > 8 else "")
+            + f'</div>{lista_cola(p, cola[:8], "Nada escalado: Helpert está resolviendo todo.")}</section>')
         cuerpo = (encabezado("Casos", "Conversaciones de los equipos con Helpert. La página se actualiza cada 20 segundos.")
-                  + cifras + tarjeta_tabla)
+                  + cifras + tarjeta_cola + tarjeta_tabla)
         return pagina("Casos", cuerpo, p, "casos", refrescar=20, libs=("datatables", "choices"))
 
     @app.get("/consola/caso/{caso_id}", include_in_schema=False)
@@ -557,7 +666,7 @@ def montar(app: FastAPI, cfg: dict) -> None:
                                           or k["usuario"])),
                          ("Ubicación", ubicacion, e(ubicacion)),
                          ("Control remoto", k["remoto"], f'<span class="codigo select-all">{e(k["remoto"])}</span>'),
-                         ("Equipo", k["equipo"], f'{e(k["equipo"])} · {e(k["so"])}')]),
+                         ("Equipo", k["equipo"], f'{e(k["equipo"])} · {e(sistema(k["equipo_so"] or k["so"]))}')]),
             ("Clasificación", [("Nivel", 1, insignia(*NIVEL[k["nivel"]])),
                                ("Asignado a", k["asignado"] or k["asignado_email"], e(k["asignado"] or k["asignado_email"])),
                                ("Tipo", k["tipo"], e(k["tipo"])),
@@ -572,12 +681,13 @@ def montar(app: FastAPI, cfg: dict) -> None:
                         ("Resuelto", k["resuelto"] is not None, e({True: "Sí", False: "No"}.get(k["resuelto"]))),
                         ("Calificación", k["calificacion"], f'{e(k["calificacion"])} / 5'),
                         ("Comentario", k["comentario"], e(k["comentario"]))])]
-        ficha = '<div class="space-y-4">' + "".join(
+        visibles = [(g, [x for x in filas_g if x[1] not in (None, "", False, 0)]) for g, filas_g in grupos_d]
+        ficha = '<div class="space-y-4">' + "".join(  # un grupo sin datos no deja su título suelto
             f'<div><p class="mb-1 text-xs font-medium text-muted-foreground">{g}</p><dl class="divide-y text-sm">'
             + "".join(f'<div class="grid grid-cols-[7rem_1fr] gap-3 py-1.5"><dt class="text-muted-foreground">{t_}</dt>'
-                      f'<dd class="min-w-0 break-words">{v}</dd></div>' for t_, crudo, v in filas_g if crudo not in (None, "", False, 0))
-            + '</dl></div>' for g, filas_g in grupos_d) + '</div>'
-        nota = (f'<div class="alerta border-alerta/40">{icono("alerta")}<div><p class="font-medium">Nota interna</p>'
+                      f'<dd class="min-w-0 break-words">{v}</dd></div>' for t_, _, v in filas_g)
+            + '</dl></div>' for g, filas_g in visibles if filas_g) + '</div>'
+        nota = (f'<div class="alerta border-alerta/40">{icono("alerta")}<div><p class="font-medium">Nota de Helpert</p>'
                 f'<p class="whitespace-pre-wrap break-words text-muted-foreground">{e(k["nota"])}</p></div></div>' if k["nota"] else "")
 
         def tarjeta(titulo, desc, contenido):
@@ -593,7 +703,7 @@ def montar(app: FastAPI, cfg: dict) -> None:
             ver = (f'<a class="btn btn-borde btn-sm" href="/consola/caso/{k["id"]}/captura/{x["id"]}" target="_blank" '
                    f'rel="noopener">{icono("camara")}Ver captura</a>' if x["hay"] and ve_capturas else
                    insignia("Borrada por retención", "neutra") if not x["hay"] else
-                   '<span class="text-xs text-muted-foreground">Solo la ven el Analista N2 y el técnico asignado.</span>')
+                   '<span class="text-xs text-muted-foreground">Solo la ven el analista, Administración y el técnico asignado.</span>')
             desc = (f'<p class="whitespace-pre-wrap break-words text-xs text-muted-foreground">{e(x["descripcion"])} '
                     f'({e(x["modelo"])})</p>' if x["descripcion"] else "")
             return (f'<li class="grid gap-2 py-2.5 text-sm"><div class="flex flex-wrap items-center gap-2">'
@@ -606,8 +716,8 @@ def montar(app: FastAPI, cfg: dict) -> None:
                        ("Atendida", fecha(visita["atendida"])), ("Notas", e(visita["notas"])), ("Insumos", e(visita["insumos"]))]
             bloque_visita = ('<dl class="divide-y text-sm">' + "".join(
                 f'<div class="grid grid-cols-[8.5rem_1fr] gap-3 py-2"><dt class="text-muted-foreground">{t}</dt>'
-                f'<dd class="min-w-0 break-words">{v}</dd></div>' for t, v in datos_v) + '</dl>'
-                f'<a class="btn btn-borde btn-sm mt-3" href="/consola/visitas#v{visita["id"]}">{icono("visitas")}Ir a la cola</a>')
+                f'<dd class="min-w-0 break-words">{v}</dd></div>' for t, v in datos_v if v != "—") + '</dl>'
+                f'<a class="btn btn-borde btn-sm mt-3" href="/consola/visitas#v{visita["id"]}">{icono("visitas")}Ir a la visita</a>')
         elif p["rol"] in JEFES and k["estado"] == "escalado":
             bloque_visita = ('<p class="mb-3 text-sm text-muted-foreground">Si necesita presencia (tóner, papel, hardware), '
                              'pide la visita de un técnico.</p>' + boton_post(p, f"/consola/caso/{k['id']}/visita",
@@ -619,9 +729,26 @@ def montar(app: FastAPI, cfg: dict) -> None:
         if k["estado"] == "escalado":
             sla = k["sla_n3_min"] if k["nivel"] >= 3 else k["sla_n2_min"]
             vence = k["escalado"] + timedelta(minutes=sla) if k["escalado"] and sla else None
-            humano = (f'<p class="mb-3 text-sm">{insignia(*NIVEL[k["nivel"]])} '
-                      + (f'Responder antes de {fecha(vence)}' + (" · " + insignia("Vencido", "peligro") if vence < db.ahora() else "")
-                         if vence else "") + '</p><div class="flex flex-wrap gap-2">')
+            # Lo que Helpert (N1) ya intentó, para no repetirlo: motivo, playbook y su último paso, cuánto conversó
+            ult = trabajos[-1] if trabajos else None
+            tel = k["persona_telefono"]
+            resumen = [
+                ("Escalado", f'hace {duracion((db.ahora() - k["escalado"]).total_seconds())}' if k["escalado"] else None),
+                ("Nota de Helpert", e(k["nota"]) if k["nota"] else None),
+                ("Playbook", f'<span class="codigo">{e(ult["playbook"])}</span> · «{e(ult["paso"])}» {codigo_paso(ult["codigo"])}'
+                 if ult else "Ninguno: solo conversó"),
+                ("Conversación", " · ".join(f'{n} {uno if n == 1 else varios}' for n, uno, varios in (
+                    (sum(m["rol"] == "helpert" for m in mensajes), "respuesta de Helpert", "respuestas de Helpert"),
+                    (sum(m["rol"] == "usuario" for m in mensajes), "mensaje de la persona", "mensajes de la persona")))),
+                ("Contacto", (f'<a class="underline-offset-4 hover:underline" href="tel:{e(re.sub(r"[^0-9+]", "", tel))}">{e(tel)}</a>'
+                              if tel else None)),
+                ("Control remoto", f'<span class="codigo select-all">{e(k["remoto"])}</span>' if k["remoto"] else None)]
+            humano = ('<dl class="mb-4 divide-y rounded-lg border bg-muted/40 px-3 text-sm">' + "".join(
+                f'<div class="grid grid-cols-[7.5rem_1fr] gap-3 py-1.5"><dt class="text-muted-foreground">{t}</dt>'
+                f'<dd class="min-w-0 break-words">{v}</dd></div>' for t, v in resumen if v) + '</dl>'
+                f'<p class="mb-3 text-sm">{insignia(*NIVEL[k["nivel"]])} '
+                + (f'Responder antes de {fecha(vence)}' + (" · " + insignia("Vencido", "peligro") if vence < db.ahora() else "")
+                   if vence else "") + '</p><div class="flex flex-wrap gap-2">')
             if k["asignado_id"] != p["id"]:
                 humano += boton_post(p, f"/consola/caso/{k['id']}/tomar", icono("usuario") + "Tomar el caso")
             if k["nivel"] < 3 and p["rol"] != "gerencia":
@@ -655,7 +782,8 @@ def montar(app: FastAPI, cfg: dict) -> None:
             + tarjeta("Capturas", "Evidencia con permiso del usuario; cada vista queda en la auditoría.",
                       f'<ul class="-my-2.5 divide-y">{"".join(captura(x) for x in capturas)}</ul>' if capturas else vacio("Ninguna."))
             + '</div></div><div class="min-w-0 space-y-6">'
-            + (tarjeta("Atención de soporte", "N2 atiende por control remoto o en persona; N3, lo que N2 no resuelve.", humano)
+            + (tarjeta("Atención de soporte", "Lo que Helpert ya intentó y qué hacer ahora. N2 atiende por control remoto o "
+                       "en persona; N3, lo que N2 no resuelve.", humano)
                if humano else "")
             + tarjeta("Detalle", "Persona, clasificación de la IA y cierre.", ficha)
             + tarjeta("Atención física", "Visita de un técnico de campo.", bloque_visita)
@@ -686,15 +814,21 @@ def montar(app: FastAPI, cfg: dict) -> None:
 
     @app.get("/consola/visitas", include_in_schema=False)
     def visitas(request: Request, aviso: str = ""):
+        """Atención física. Para quien asigna (analista, administración): la cola de visitas. Para el técnico: «Mi día»,
+        sus visitas con lo necesario para llegar y atender (dirección, contacto, equipo) y los casos N2 que esperan."""
         p = persona_de(request, *SOPORTE)
         jefe = p["rol"] in JEFES
         with db.conexion(dsn) as c:
             filas = c.execute(
                 "SELECT v.*, k.categoria, k.subcategoria, coalesce(pe.email, k.usuario) AS usuario, k.estado AS caso_estado, "
-                "k.empresa_id, em.nombre AS empresa, q.nombre AS equipo, q.area, coalesce(pe.sede, q.sede) AS sede, "
-                "q.piso, u.nombre AS tecnico, u.email AS tecnico_email FROM visitas v JOIN casos k ON k.id = v.caso_id "
+                "k.empresa_id, em.nombre AS empresa, q.nombre AS equipo, q.so, q.remoto, q.area, coalesce(pe.sede, q.sede) AS sede, "
+                "q.piso, pe.nombre AS persona_nombre, pe.telefono, s.direccion, s.region, "
+                "(SELECT m.texto FROM mensajes m WHERE m.caso_id = k.id AND m.rol = 'usuario' ORDER BY m.id LIMIT 1) AS problema, "
+                "u.nombre AS tecnico, u.email AS tecnico_email FROM visitas v JOIN casos k ON k.id = v.caso_id "
                 "JOIN equipos q ON q.id = k.equipo_id LEFT JOIN usuarios_consola u ON u.id = v.tecnico_id "
                 "LEFT JOIN personas pe ON pe.id = k.persona_id LEFT JOIN empresas em ON em.id = k.empresa_id "
+                # la sede se busca dentro de la empresa del caso: dos empresas pueden tener una sede con el mismo nombre
+                "LEFT JOIN sedes s ON s.empresa_id = k.empresa_id AND s.nombre = coalesce(pe.sede, q.sede) "
                 f"WHERE {alc(p, 'k.empresa_id')} AND (%s OR v.tecnico_id = %s) "
                 "AND (v.estado IN ('pendiente', 'asignada') OR v.creado > now() - interval '7 days') "
                 "ORDER BY v.estado IN ('atendida', 'cancelada'), CASE v.prioridad WHEN 'alta' THEN 0 WHEN 'media' THEN 1 ELSE 2 END, "
@@ -702,14 +836,18 @@ def montar(app: FastAPI, cfg: dict) -> None:
             # técnicos de la empresa del caso o de la plataforma (empresa vacía)
             todos = c.execute("SELECT id, coalesce(nombre, email) AS nombre, empresa_id FROM usuarios_consola WHERE rol = 'tecnico' "
                               f"AND activo AND (empresa_id IS NULL OR {alc(p, 'empresa_id')}) ORDER BY 2").fetchall() if jefe else []
+            cola_n2 = [] if jefe else cola_escalados(c, p, 2)
         tecnicos_de = lambda v: [x for x in todos if x["empresa_id"] in (None, v["empresa_id"])]
         sel = lambda nombre, ops, actual, etiqueta, id_: (
             f'<div class="grid content-start gap-2"><label class="etiqueta" for="{id_}">{etiqueta}</label>'
             f'<select class="campo" id="{id_}" name="{nombre}">' + "".join(
                 f'<option value="{v}"{" selected" if str(v) == str(actual) else ""}>{e(t)}</option>' for v, t in ops) + '</select></div>')
+        ahora = db.ahora()
+        atrasada = lambda v: v["estado"] == "asignada" and v["eta"] and v["eta"] < ahora
 
         def tarjeta_visita(v):
             ubicacion = " · ".join(x for x in (v["sede"], f'piso {v["piso"]}' if v["piso"] else "", v["area"]) if x) or "Ubicación sin registrar"
+            direccion = " · ".join(x for x in (v["direccion"], v["region"]) if x)
             acciones = ""
             tecnicos = tecnicos_de(v)
             if jefe and v["estado"] in ("pendiente", "asignada"):
@@ -721,46 +859,94 @@ def montar(app: FastAPI, cfg: dict) -> None:
                                       (480, "Hoy"), (1440, "Mañana")], 60, "Llega en", f"m{v['id']}")
                     + sel("prioridad", [("alta", "Alta"), ("media", "Media"), ("baja", "Baja")], v["prioridad"], "Prioridad", f"p{v['id']}")
                     + f'<button class="btn btn-primario"{" disabled" if not tecnicos else ""}>'
-                    f'{"Reasignar" if v["estado"] == "asignada" else "Asignar"}</button></form>')
+                    f'{"Reasignar" if v["estado"] == "asignada" else "Asignar"}</button></form>'
+                    + ('' if tecnicos else '<p class="text-xs text-muted-foreground">Crea una cuenta con rol «Asistente N2 (en sitio)» '
+                       'en Administración → Usuarios para poder asignar.</p>'))
             if v["estado"] == "asignada" and (jefe or v["tecnico_id"] == p["id"]):
                 acciones += (
-                    f'<form method="post" action="/consola/visitas/{v["id"]}/atender" class="grid gap-3">{csrf(p)}'
+                    f'<form method="post" action="/consola/visitas/{v["id"]}/atender" class="grid gap-3 border-t pt-4">{csrf(p)}'
                     f'<div class="grid gap-2"><label class="etiqueta" for="n{v["id"]}">Qué se hizo</label>'
-                    f'<textarea class="campo min-h-20" id="n{v["id"]}" name="notas" maxlength="1000" required></textarea></div>'
+                    f'<textarea class="campo min-h-20" id="n{v["id"]}" name="notas" maxlength="1000" required '
+                    f'placeholder="Lo que la persona verá en Helpert, p. ej. «Cambié el tóner y probé una impresión»"></textarea></div>'
                     f'<div class="grid gap-2"><label class="etiqueta" for="i{v["id"]}">Insumos usados</label>'
                     f'<input class="campo" id="i{v["id"]}" name="insumos" maxlength="300" placeholder="p. ej. 1 cartucho de tóner"></div>'
-                    f'<div><button class="btn btn-primario">{icono("ok")}Marcar atendida</button></div></form>')
+                    f'<div><button class="btn btn-primario">{icono("ok")}Cerrar la visita</button></div></form>')
             if jefe and v["estado"] in ("pendiente", "asignada"):
                 acciones += boton_post(p, f'/consola/visitas/{v["id"]}/cancelar', "Cancelar visita", "btn-fantasma text-peligro",
                                        "¿Cancelar la visita? El caso sigue escalado.")
             hecho = (f'<p class="text-sm"><span class="font-medium">Atendida:</span> {e(v["notas"])}'
                      f'{" · Insumos: " + e(v["insumos"]) if v["insumos"] else ""}</p>' if v["estado"] == "atendida" else "")
+            tel = v["telefono"]
+            contacto = " · ".join(x for x in (
+                e(v["persona_nombre"]) if v["persona_nombre"] else "",
+                f'<a class="underline-offset-4 hover:underline" href="tel:{e(re.sub(r"[^0-9+]", "", tel))}">{e(tel)}</a>' if tel else "",
+                f'<a class="underline-offset-4 hover:underline" href="mailto:{e(v["usuario"])}">{e(v["usuario"])}</a>'
+                if "@" in str(v["usuario"] or "") else e(v["usuario"])) if x)
+            linea = lambda ic, html_: (f'<p class="flex gap-2 text-sm">{icono(ic, "mt-0.5 size-4 shrink-0 text-muted-foreground")}'
+                                       f'<span class="min-w-0 break-words">{html_}</span></p>')
+            llegada = (f'<p class="flex flex-wrap items-center justify-end gap-1.5">{insignia("Atrasada", "peligro", "reloj") if atrasada(v) else ""}'
+                       f'Llega {fecha(v["eta"])}</p>' if v["estado"] == "asignada" and v["eta"] else "")
             return (f'<article id="v{v["id"]}" class="tarjeta gap-4 py-5"><div class="flex flex-wrap items-start justify-between gap-3 px-5">'
-                    f'<div class="min-w-0 space-y-1"><p class="flex flex-wrap items-center gap-2 font-medium">'
+                    f'<div class="min-w-0 space-y-2"><p class="flex flex-wrap items-center gap-2 font-medium">'
                     f'<a class="underline-offset-4 hover:underline" href="/consola/caso/{v["caso_id"]}">Caso #{v["caso_id"]}</a>'
                     f'{insignia(*VISITA[v["estado"]])}{insignia("Prioridad " + v["prioridad"], PRIORIDAD[v["prioridad"]])}</p>'
-                    f'<p class="text-sm text-muted-foreground">{icono("visitas", "inline size-3.5 -mt-0.5")} {e(ubicacion)} · '
-                    f'{icono("equipo", "inline size-3.5 -mt-0.5")} {e(v["equipo"])} · {e(v["usuario"])}</p>'
-                    f'<p class="text-sm">{e(v["categoria"])} · {e(v["subcategoria"])}'
-                    + (f' · <span class="text-muted-foreground">{e(v["empresa"])}</span>' if p["empresa_id"] is None else "")
-                    + '</p></div>'
+                    f'<p class="text-sm font-medium">{e(v["categoria"] or "Sin clasificar")}'
+                    + (f' <span class="font-normal text-muted-foreground">· {e(v["subcategoria"])}</span>' if v["subcategoria"] else "")
+                    + (f' <span class="font-normal text-muted-foreground">· {e(v["empresa"])}</span>' if p["empresa_id"] is None else "")
+                    + '</p>'
+                    + (f'<blockquote class="border-l-2 pl-3 text-sm text-muted-foreground">«{e(str(v["problema"])[:240])}»</blockquote>'
+                       if v["problema"] else "")
+                    + linea("visitas", e(ubicacion) + (f' <span class="text-muted-foreground">— {e(direccion)}</span>' if direccion else ""))
+                    + linea("usuario", contacto)
+                    + linea("equipo", f'{e(v["equipo"])} ({e(sistema(v["so"]) or "sistema sin informar")})'
+                            + (f' · <span class="codigo select-all">{e(v["remoto"])}</span>' if v["remoto"] else ""))
+                    + '</div>'
                     f'<div class="text-right text-xs text-muted-foreground"><p>Pedida {fecha(v["creado"])}</p>'
-                    + (f'<p>{e(v["tecnico"] or v["tecnico_email"])} · llega {fecha(v["eta"])}</p>' if v["tecnico_id"] else "")
+                    + (f'<p>{e(v["tecnico"] or v["tecnico_email"])}</p>' if v["tecnico_id"] and jefe else "") + llegada
                     + f'</div></div><div class="grid gap-4 px-5">{hecho}{acciones}</div></article>')
 
         mensajes_v = {"asignada": "Visita asignada. El usuario recibe el aviso en Helpert.",
-                      "atendida": "Visita atendida. Helpert le pregunta al usuario si se resolvió.",
+                      "atendida": "Visita cerrada. Helpert le pregunta a la persona si se resolvió.",
                       "cancelada": "Visita cancelada.", "creada": "Visita creada: falta asignarla."}
         aviso_html = (f'<div class="alerta border-primary/30 bg-primario-suave/40 text-sobre-primario-suave" role="status">'
                       f'{icono("ok")}<p>{e(mensajes_v[aviso])}</p></div>' if aviso in mensajes_v else "")
-        lista = "".join(tarjeta_visita(v) for v in filas) or (
-            '<p class="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">'
-            + ("No hay visitas abiertas." if jefe else "No tienes visitas asignadas.") + '</p>')
-        cuerpo = (encabezado("Atención física", "Visitas de técnicos de campo: tóner, papel, hardware. "
-                             + ("Asigna cada visita a un técnico; el usuario recibe el aviso en Helpert." if jefe
-                                else "Tus visitas asignadas; ciérralas aquí al terminar."))
-                  + aviso_html + f'<div class="grid gap-4">{lista}</div>')
-        return pagina("Atención física", cuerpo, p, "visitas")  # sin recarga: el técnico escribe sus notas aquí
+        vacio_v = lambda t: f'<p class="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">{t}</p>'
+        if jefe:
+            lista = "".join(tarjeta_visita(v) for v in filas) or vacio_v("No hay visitas abiertas.")
+            cuerpo = (encabezado("Atención física", "Visitas de técnicos de campo: tóner, papel, hardware. Asigna cada visita a un "
+                                 "técnico; el usuario recibe el aviso en Helpert.") + aviso_html + f'<div class="grid gap-4">{lista}</div>')
+            return pagina("Atención física", cuerpo, p, "visitas")  # sin recarga: aquí se escriben notas
+
+        # «Mi día» del técnico (N2 en sitio)
+        abiertas = sorted((v for v in filas if v["estado"] == "asignada"), key=lambda v: (v["eta"] or ahora, v["id"]))
+        hechas = [v for v in filas if v["estado"] in ("atendida", "cancelada")]
+        hoy = datetime.now(zona())
+        hoy_txt = (f'{("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")[hoy.weekday()]} {hoy.day} de '
+                   f'{("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre")[hoy.month - 1]}')
+        atendidas_hoy = sum(1 for v in hechas if v["atendida"] and v["atendida"].astimezone(zona()).date() == hoy.date())
+        sin_tomar = sum(1 for k in cola_n2 if not k["asignado_id"])
+        cifras = ('<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">'
+                  + cifra("Visitas por atender", str(len(abiertas)), "Asignadas a ti", "visitas", compacta=True)
+                  + cifra("Atrasadas", str(sum(1 for v in abiertas if atrasada(v))), "Pasó la hora de llegada que se avisó",
+                          "reloj", "text-peligro" if any(atrasada(v) for v in abiertas) else "", compacta=True)
+                  + cifra("Atendidas hoy", str(atendidas_hoy), "Visitas que cerraste hoy", "ok", compacta=True)
+                  + cifra("Casos N2 sin tomar", str(sin_tomar), "Para atender por control remoto o en persona", "escalar",
+                          "text-peligro" if sin_tomar else "", compacta=True) + '</div>')
+        seccion = lambda t, d, html_: (f'<section class="space-y-3"><div><h2 class="text-lg font-semibold tracking-tight">{t}</h2>'
+                                       f'<p class="text-sm text-muted-foreground">{d}</p></div>{html_}</section>')
+        cuerpo = (encabezado("Mi día", f'{hoy_txt.capitalize()}. Tus visitas, con dirección y contacto, y los casos N2 que esperan.')
+                  + aviso_html + cifras
+                  + seccion("Visitas por atender", "En orden de llegada. Al terminar, cuenta qué hiciste y cierra la visita: "
+                            "Helpert le pregunta a la persona si se resolvió.",
+                            f'<div class="grid gap-4">{"".join(tarjeta_visita(v) for v in abiertas)}</div>' if abiertas
+                            else vacio_v("No tienes visitas asignadas. Cuando te asignen una, aparece aquí."))
+                  + seccion("Casos N2 que esperan", "Escalados por Helpert; primero los que vencen antes. Ábrelo, tómalo y "
+                            "atiéndelo por control remoto, o pide que te asignen la visita.",
+                            f'<div class="tarjeta gap-0 overflow-hidden py-0">{lista_cola(p, cola_n2, "Ningún caso N2 espera.")}</div>')
+                  + (f'<details class="group"><summary class="cursor-pointer text-sm font-medium text-muted-foreground '
+                     f'hover:text-foreground">Atendidas o canceladas en los últimos 7 días ({len(hechas)})</summary>'
+                     f'<div class="mt-3 grid gap-4">{"".join(tarjeta_visita(v) for v in hechas)}</div></details>' if hechas else ""))
+        return pagina("Mi día", cuerpo, p, "visitas")  # sin recarga: el técnico escribe sus notas aquí
 
     def aviso_equipo(c, caso_id, texto, cierre=False):
         c.execute("INSERT INTO avisos (equipo_id, caso_id, texto, cierre) SELECT equipo_id, id, %s, %s FROM casos WHERE id = %s",
@@ -1042,8 +1228,13 @@ def montar(app: FastAPI, cfg: dict) -> None:
             {"nombre": "Escalados", "color": "peligro", "datos": [f["escalados"] for f in por_cat]},
             {"nombre": "Otros", "color": "neutro", "datos": [f["total"] - f["resueltos"] - f["escalados"] for f in por_cat]}]}
 
-        def grafico(datos, alto="h-72"):
-            return f'<div class="{alto} w-full" data-grafico="{e(json.dumps(datos, ensure_ascii=False))}" role="img" aria-label="Gráfico"></div>'
+        def grafico(datos, nombre, alto="h-72"):
+            # el lector de pantalla oye los totales que dibuja el gráfico
+            totales = ([(x["nombre"], x["valor"]) for x in datos["datos"]] if datos["tipo"] == "dona"
+                       else [(s["nombre"], sum(s["datos"])) for s in datos["series"]])
+            etiqueta = f'{nombre}. ' + ", ".join(f"{n}: {v}" for n, v in totales)
+            return (f'<div class="{alto} w-full" data-grafico="{e(json.dumps(datos, ensure_ascii=False))}" role="img" '
+                    f'aria-label="{e(etiqueta)}"></div>')
 
         def tarjeta(titulo, desc, contenido, clase="", cuerpo_clase="tarjeta-cuerpo"):
             return (f'<section class="tarjeta {clase}"><div class="tarjeta-cab"><h2 class="tarjeta-titulo">{titulo}</h2>'
@@ -1059,10 +1250,11 @@ def montar(app: FastAPI, cfg: dict) -> None:
                     f'<td class="{"text-right tabular-nums" if i else "font-medium"}">'
                     f'{e(f[k]) if i else (f"<span class=\"codigo\">{e(f[k])}</span>" if id_ == "tabla-pb" else e(f[k]))}</td>'
                     for i, (k, _) in enumerate(columnas))
-                + (f'<td class="w-28"><progress class="progreso" max="{maximo}" value="{f[barra]}" '
+                # la barra solo en pantallas muy anchas: en una tarjeta de media pantalla empujaba la tabla fuera del borde
+                + (f'<td class="hidden w-28 2xl:table-cell"><progress class="progreso" max="{maximo}" value="{f[barra]}" '
                    f'aria-label="{e(f[barra])} de {maximo}"></progress></td>' if barra else "") + "</tr>" for f in filas)
             return (f'<div class="tabla-caja"><table id="{id_}" class="tabla" data-tabla="simple">'
-                    f'<thead><tr>{cab}{"<th data-orderable=\"false\"><span class=\"sr-only\">Proporción</span></th>" if barra else ""}</tr></thead>'
+                    f'<thead><tr>{cab}{"<th class=\"hidden 2xl:table-cell\" data-orderable=\"false\"><span class=\"sr-only\">Proporción</span></th>" if barra else ""}</tr></thead>'
                     f'<tbody>{cuerpo}</tbody></table></div>')
 
         opcion = lambda v, txt, act: f'<option value="{e(v)}"{" selected" if v == act else ""}>{e(txt)}</option>'
@@ -1103,8 +1295,8 @@ def montar(app: FastAPI, cfg: dict) -> None:
                  + "".join(meta(*i) for i in indicadores) + '</div></section>')
         graficos = ver("graficos", '<div class="grid gap-6 lg:grid-cols-3">'
                     + tarjeta("Casos por " + ("mes" if unidad == "month" else "día"), "Según cómo terminaron.",
-                              grafico(grafico_fechas), "lg:col-span-2")
-                    + tarjeta("Resultado", f"{g['total']} casos del período.", grafico(grafico_resultado))
+                              grafico(grafico_fechas, "Casos por fecha según cómo terminaron"), "lg:col-span-2")
+                    + tarjeta("Resultado", f"{g['total']} casos del período.", grafico(grafico_resultado, "Resultado de los casos del período"))
                     + '</div>')
         sangria = "[&_.tabla_th:first-child]:pl-6 [&_.tabla_td:first-child]:pl-6 [&_.tabla_th:last-child]:pr-6 [&_.tabla_td:last-child]:pr-6"
         con_tabla = "gap-4 overflow-hidden pb-0"
@@ -1114,9 +1306,9 @@ def montar(app: FastAPI, cfg: dict) -> None:
         por_nivel = [{**f, "nombre": NIVEL.get(f["nombre"], (str(f["nombre"]),))[0]} for f in por_nivel]
         detalle = (ver("empresas", tarjeta(
             "Por empresa", "Volumen, resultado y costo de IA de cada empresa; el gráfico muestra sus categorías.",
-            '<div class="grid items-start gap-2 lg:grid-cols-2">'
-            + (f'<div class="px-4">{grafico(grafico_cruce, "h-80")}</div>' if cruce else "")
-            + '<div class="self-stretch border-t lg:border-l lg:border-t-0">'
+            '<div class="grid items-start gap-2 2xl:grid-cols-2">'
+            + (f'<div class="px-4">{grafico(grafico_cruce, "Categorías de cada empresa", "h-80")}</div>' if cruce else "")
+            + '<div class="self-stretch border-t 2xl:border-l 2xl:border-t-0">'
             + tabla("tabla-empresas", por_empresa, con("Empresa") + [("costo", "IA (US$)")], "total") + '</div></div>',
             con_tabla, f"px-0 {sangria}") if por_empresa else "")
             + ver("niveles", tarjeta("Por nivel", "N1 es Helpert; N2, soporte en sitio; N3, el analista. Muestra dónde se resuelve.",
@@ -1128,31 +1320,43 @@ def montar(app: FastAPI, cfg: dict) -> None:
                                       con_tabla, f"px-0 {sangria}"))
             + ver("categorias", tarjeta("Por categoría", "Categorías ITIL que asignó la IA.",
                     '<div class="grid items-center gap-2 lg:grid-cols-2">'
-                    + (f'<div class="px-4">{grafico(grafico_cat, "h-64")}</div>' if por_cat else "")
+                    + (f'<div class="px-4">{grafico(grafico_cat, "Casos por categoría", "h-64")}</div>' if por_cat else "")
                     + '<div class="self-stretch border-t lg:border-l lg:border-t-0">'
                     + tabla("tabla-cat", por_cat, [("nombre", "Categoría"), ("total", "Casos"), ("resueltos", "Resueltos"),
                                                    ("escalados", "Escalados")], "total") + '</div></div>',
                     con_tabla, f"px-0 {sangria}"))
-            + '<div class="grid items-start gap-6 lg:grid-cols-2">'
+            + '<div class="grid items-start gap-6 2xl:grid-cols-2">'
             + ver("subcategorias", tarjeta("Subcategorías", "Las 15 más frecuentes: candidatas a un playbook nuevo.",
                                            tabla("tabla-sub", por_sub, con("Categoría · subcategoría"), "total"),
                                            con_tabla, f"px-0 {sangria}"))
             + ver("sedes", tarjeta("Por sede", "Según la sede de la persona (o la del equipo).",
                                    tabla("tabla-sedes", por_sede, con("Sede"), "total"), con_tabla, f"px-0 {sangria}"))
-            + '</div><div class="grid items-start gap-6 lg:grid-cols-3">'
+            + '</div><div class="grid items-start gap-6 2xl:grid-cols-3">'
             + ver("playbooks", tarjeta("Por playbook", "Pasos que corrieron los equipos.",
                       tabla("tabla-pb", por_pb, [("nombre", "Playbook"), ("diagnosticos", "Diagnósticos"),
                                                  ("aplicados", "Aplicados"), ("verificados", "Verificados"),
                                                  ("fallos", "Fallos")], "diagnosticos"),
-                      f"{con_tabla} lg:col-span-2", f"px-0 {sangria}"))
+                      f"{con_tabla} 2xl:col-span-2", f"px-0 {sangria}"))
             + ver("modelos", tarjeta("Por modelo de IA", "Incidencias: el proveedor falló o respondió fuera del contrato.",
                                      tabla("tabla-modelo", por_modelo, [("nombre", "Modelo"), ("total", "Casos"),
                                                                         ("con_incidencia", "Incidencias"), ("costo", "US$")], None),
                                      con_tabla, f"px-0 {sangria}"))
             + '</div>')
         alcance = p["empresa"] or next((x["nombre"] for x in empresas if x["id"] == empresa), "todas las empresas")
+        # En palabras, para quien lee rápido (gerencia): lo mismo que dicen las cifras de abajo
+        n1 = pct(g["resueltos_n1"], terminados)
+        resumen = (f'En {"el último año" if dias == 365 else f"los últimos {dias} días"} hubo <strong>{g["total"]} casos</strong> de '
+                   f'{g["personas"]} personas. '
+                   + (f'Helpert resolvió solo <strong>{g["resueltos_n1"]}</strong> ({n1:.0f} % de los terminados); '
+                      if n1 is not None else "Aún no hay casos terminados; ")
+                   + f'{g["con_humano"]} necesitaron soporte humano y {g["escalados"]} siguen escalados'
+                   + (f', <strong class="text-peligro">{g["vencidos"]} fuera de tiempo</strong>' if g["vencidos"] else "")
+                   + '. '
+                   + (f'Satisfacción: <strong>{g["satisfaccion"]:.1f} de 5</strong>. ' if g["satisfaccion"] else "Todavía sin calificaciones. ")
+                   + f'Costo de IA: US$ {g["costo"]:.2f}' + (f' (US$ {g["costo"] / g["total"]:.3f} por caso).' if g["total"] else "."))
         cuerpo = (encabezado("Métricas", f"Analítica de soporte de {e(alcance)}. Se actualiza cada minuto.")
                   + f'<div class="tarjeta py-4"><div class="px-4">{periodo}</div></div>'
+                  + f'<p class="max-w-4xl text-pretty text-sm leading-relaxed">{resumen}</p>'
                   + volumen + metas + graficos + detalle)
         return pagina("Métricas", cuerpo, p, "metricas", refrescar=60, libs=("datatables", "echarts"))
 
@@ -1202,9 +1406,27 @@ def montar(app: FastAPI, cfg: dict) -> None:
     def volver(seccion, aviso):
         return RedirectResponse(f"/consola/admin/{seccion}?{urlencode({'aviso': aviso})}", 303)
 
-    def tarjeta(titulo, desc, contenido, clase="", cuerpo_clase="tarjeta-cuerpo"):
-        return (f'<section class="tarjeta {clase}"><div class="tarjeta-cab"><h2 class="tarjeta-titulo">{titulo}</h2>'
+    def tarjeta(titulo, desc, contenido, clase="", cuerpo_clase="tarjeta-cuerpo", id_=""):
+        return (f'<section class="tarjeta {clase}"{f" id=\"{id_}\"" if id_ else ""}><div class="tarjeta-cab"><h2 class="tarjeta-titulo">{titulo}</h2>'
                 f'<p class="tarjeta-desc">{desc}</p></div><div class="{cuerpo_clase}">{contenido}</div></section>')
+
+    def resumen_empresa(c, eid):
+        """Salud de una empresa: equipos (por sistema), escalados y satisfacción de los últimos 30 días."""
+        return c.execute("""
+            SELECT (SELECT count(*) FROM equipos WHERE empresa_id = %(e)s AND revocado IS NULL AND visto > now() - %(s)s) AS en_linea,
+              (SELECT count(*) FROM equipos WHERE empresa_id = %(e)s AND revocado IS NULL AND version IS NOT NULL
+                 AND (visto IS NULL OR visto <= now() - %(s)s)) AS sin_senal,
+              (SELECT count(*) FROM equipos WHERE empresa_id = %(e)s AND revocado IS NULL AND lower(so) = 'linux') AS linux,
+              (SELECT count(*) FROM equipos WHERE empresa_id = %(e)s AND revocado IS NULL AND lower(so) = 'windows') AS windows,
+              (SELECT count(*) FROM usuarios_consola WHERE empresa_id = %(e)s AND activo) AS cuentas,
+              count(*) FILTER (WHERE k.estado = 'escalado') AS escalados,
+              count(*) FILTER (WHERE k.estado = 'escalado' AND coalesce(k.escalado, k.creado) + make_interval(mins =>
+                CASE WHEN k.nivel >= 3 THEN em.sla_n3_min ELSE em.sla_n2_min END) < now()) AS vencidos,
+              (avg(k.calificacion) FILTER (WHERE k.creado > now() - interval '30 days'))::float AS satisfaccion,
+              count(*) FILTER (WHERE k.creado > now() - interval '30 days' AND k.estado = 'cerrado' AND k.resuelto
+                               AND k.nivel = 1) AS resueltos_n1
+            FROM empresas em LEFT JOIN casos k ON k.empresa_id = em.id WHERE em.id = %(e)s""",
+                         {"e": eid, "s": SIN_SENAL}).fetchone()
 
     def admin_pagina(p, seccion, contenido, aviso="", secreto=None, mensaje=None):
         pestanas = ('<nav class="pestanas md:hidden" aria-label="Secciones de administración">' + "".join(
@@ -1354,7 +1576,7 @@ def montar(app: FastAPI, cfg: dict) -> None:
                     f'{icono("equipo", "size-4 text-muted-foreground")}{e(q["nombre"])}</a>'
                     + (f'<p class="text-xs text-muted-foreground">{e(q["empresa"] or "Sin empresa: nadie inició sesión")}</p>'
                        if p["rol"] == "admin" else "") + f'</td><td>{estado}</td>'
-                    f'<td class="text-muted-foreground">{e(ubicacion)}</td><td>{e((q["so"] or "").capitalize())}</td>'
+                    f'<td class="text-muted-foreground">{e(ubicacion)}</td><td>{e(sistema(q["so"]))}</td>'
                     f'<td class="tabular-nums text-muted-foreground"><span class="inline-flex flex-wrap items-center gap-1">'
                     f'{e(q["version"])}{papel(q["binario_sha"])}{insignia("Piloto", "borde") if q["piloto"] else ""}</span></td>'
                     f'<td data-order="{q["visto"].isoformat() if q["visto"] else ""}" class="whitespace-nowrap tabular-nums '
@@ -1399,7 +1621,7 @@ def montar(app: FastAPI, cfg: dict) -> None:
                    '<th>Huella</th><th class="text-right">Tamaño</th><th>Publicada</th><th class="text-right">Equipos</th>'
                    '<th class="text-right">Pasos con error (48 h)</th></tr></thead><tbody>' + "".join(
                        f'<tr><td><span class="inline-flex items-center gap-2 font-medium">{e(v["version"])}{papel(v["sha256"])}</span></td>'
-                       f'<td>{e(v["so"].capitalize())}</td><td class="font-mono text-xs">{v["sha256"][:12]}</td>'
+                       f'<td>{e(sistema(v["so"]))}</td><td class="font-mono text-xs">{v["sha256"][:12]}</td>'
                        f'<td class="text-right tabular-nums">{v["tamano"] / 1_048_576:.1f} MB</td>'
                        f'<td class="whitespace-nowrap tabular-nums text-muted-foreground">{fecha(v["subida"])}</td>'
                        f'<td class="text-right tabular-nums">{v["equipos"]}</td><td class="text-right tabular-nums">'
@@ -1558,6 +1780,58 @@ def montar(app: FastAPI, cfg: dict) -> None:
                   (SELECT count(*) FROM casos WHERE creado > now() - interval '24 hours' AND modelo IS NULL AND estado <> 'conversando') AS sin_ia,
                   (SELECT count(*) FROM trabajos WHERE creado > now() - interval '24 hours' AND estado = 'hecho' AND codigo NOT IN (0, 10)) AS fallos,
                   (SELECT count(*) FROM casos WHERE estado = 'escalado') AS escalados""", {"s": SIN_SENAL}).fetchone()
+            agentes = c.execute("""
+                SELECT lower(so) AS so, version, count(*) AS total, count(*) FILTER (WHERE visto > now() - %(s)s) AS en_linea,
+                  count(*) FILTER (WHERE version IS NOT NULL AND (visto IS NULL OR visto <= now() - %(s)s)) AS sin_senal
+                FROM equipos WHERE revocado IS NULL GROUP BY 1, 2 ORDER BY 1 NULLS LAST, 2 DESC NULLS LAST""", {"s": SIN_SENAL}).fetchall()
+            uso_ia = {f["modelo"]: f for f in c.execute("""
+                SELECT modelo, count(*) AS casos, count(*) FILTER (WHERE nota IS NOT NULL) AS incidencias, max(creado) AS ultimo
+                FROM casos WHERE creado > now() - interval '24 hours' AND modelo IS NOT NULL GROUP BY 1""")}
+            bajos = [f for f in fondos(c, "e.fondo_activo AND e.activa") if float(f["saldo"]) < float(f["alerta_usd"])]
+        tabla_agentes = ('<div class="tabla-caja"><table class="tabla"><thead><tr><th>Sistema</th><th>Versión del agente</th>'
+                         '<th class="text-right">Equipos</th><th class="text-right">En línea</th><th class="text-right">Sin señal</th>'
+                         '</tr></thead><tbody>' + "".join(
+                             f'<tr><td class="font-medium">{e(sistema(f["so"]) or "Sin informar")}</td>'
+                             f'<td class="tabular-nums">{e(f["version"] or "Sin latido (agente anterior)")}</td>'
+                             f'<td class="text-right tabular-nums">{f["total"]}</td><td class="text-right tabular-nums">{f["en_linea"]}</td>'
+                             f'<td class="text-right tabular-nums{" text-peligro" if f["sin_senal"] else ""}">{f["sin_senal"]}</td></tr>'
+                             for f in agentes) + '</tbody></table></div>'
+                         if agentes else '<p class="px-6 py-8 text-center text-sm text-muted-foreground">Todavía no hay equipos.</p>')
+
+        def salud_ia(i, x):
+            u = uso_ia.get(x["modelo"])
+            if not x.get("activo", True):
+                estado_ = insignia("Inactivo", "neutra", "prohibido")
+            elif u and u["incidencias"] * 5 > u["casos"]:  # más de 1 de cada 5 casos con error o respaldo
+                estado_ = insignia(f'{u["incidencias"]} incidencias', "peligro", "alerta")
+            elif u:
+                estado_ = insignia("Respondiendo", "exito", "ok")
+            else:
+                estado_ = insignia("Sin uso en 24 h", "neutra")
+            local = x.get("local", x.get("proveedor") == "ollama")
+            return (f'<li class="flex flex-wrap items-center gap-2 py-2.5 text-sm"><span class="flex size-6 shrink-0 items-center '
+                    f'justify-center rounded-full bg-muted text-xs font-semibold">{i + 1}</span><span class="font-medium">'
+                    f'{e(x["modelo"])}</span>{insignia("Local" if local else "Externo", "borde")}<span class="ml-auto flex '
+                    f'flex-wrap items-center gap-2 text-xs text-muted-foreground">'
+                    + (f'{u["casos"]} casos · último {fecha(u["ultimo"])}' if u else "") + f'{estado_}</span></li>')
+        cadena_ia = (f'<ol class="-my-2.5 divide-y">{"".join(salud_ia(i, x) for i, x in enumerate(a["ia"]))}</ol>' if a["ia"] else
+                     '<p class="text-sm text-muted-foreground">La cadena está vacía: Helpert ofrece el menú sin IA.</p>')
+        cadena_ia += f'<a class="btn btn-borde btn-sm mt-4" href="/consola/admin/ia">{icono("ia")}Configurar la cadena</a>'
+        lista_bajos = ('<ul class="-my-2.5 divide-y">' + "".join(
+            f'<li class="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm"><a class="font-medium underline-offset-4 '
+            f'hover:underline" href="/consola/admin/empresas/{f["id"]}">{e(f["nombre"])}</a><span class="tabular-nums '
+            f'text-peligro">{usd(f["saldo"])} <span class="text-xs text-muted-foreground">≈ {atenciones(f):,} atenciones</span></span></li>'
+            for f in bajos) + '</ul>' if bajos else
+            f'<p class="flex items-center gap-2 text-sm text-muted-foreground">{icono("ok", "size-4 text-exito")}'
+            'Ninguna empresa con fondo bajo.</p>')
+        plataforma = (tarjeta("Agentes por sistema y versión", "Equipos habilitados. «Sin señal»: el agente dejó de enviar su latido.",
+                                tabla_agentes, "gap-4 overflow-hidden pb-0",
+                                "px-0 [&_.tabla_th:first-child]:pl-6 [&_.tabla_td:first-child]:pl-6 "
+                                "[&_.tabla_th:last-child]:pr-6 [&_.tabla_td:last-child]:pr-6")
+                      + '<div class="grid items-start gap-6 xl:grid-cols-2">'
+                      + tarjeta("Cadena de IA", "En orden de uso, con lo que respondió en las últimas 24 horas.", cadena_ia)
+                      + tarjeta("Fondos de IA bajos", "Empresas con fondo activo y saldo bajo su aviso: sin saldo, solo IA local "
+                                "o el menú.", lista_bajos) + '</div>')
         servicio = ('<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">'
                     + cifra("Agentes en línea", f'{ser["en_linea"]} / {ser["equipos"]}',
                             f'{ser["sin_senal"]} sin señal' if ser["sin_senal"] else "Ninguno sin señal", "equipo",
@@ -1566,8 +1840,8 @@ def montar(app: FastAPI, cfg: dict) -> None:
                             f'{ser["sin_ia"]} casos sin IA (menú)', "ia", "text-peligro" if ser["sin_ia"] else "")
                     + cifra("Playbooks fallidos (24 h)", str(ser["fallos"]), "Pasos con error en los equipos", "lista",
                             "text-peligro" if ser["fallos"] else "")
-                    + cifra("Escalados pendientes", str(ser["escalados"]), "Esperan al Analista N2", "escalar") + '</div>')
-        contenido = (servicio
+                    + cifra("Escalados pendientes", str(ser["escalados"]), "Esperan a soporte (N2 o N3)", "escalar") + '</div>')
+        contenido = (servicio + plataforma
                      + tarjeta("Interruptores de emergencia", "Actúan en segundos en todos los equipos y quedan en la auditoría.",
                                interruptores)
                      + '<div class="grid items-start gap-6 xl:grid-cols-3">'
@@ -1931,7 +2205,7 @@ def montar(app: FastAPI, cfg: dict) -> None:
         resumen_cap = (f'<p class="text-sm text-muted-foreground">{guardadas["vivas"]} '
                        f'{"captura guardada" if guardadas["vivas"] == 1 else "capturas guardadas"} '
                        f'({guardadas["bytes"] / 1_048_576:.1f} MB) · {guardadas["rechazadas"]} permisos rechazados. '
-                       'Solo las ven el Analista N2, Administración y el técnico asignado; cada vista queda en la auditoría.</p>')
+                       'Solo las ven el analista, Administración y el técnico asignado; cada vista queda en la auditoría.</p>')
         con_regla = {ajustes.norma_area(r["area"]) for r in reglas}
         cuenta = lambda area: sum(f["n"] for f in areas if ajustes.norma_area(f["area"]) == ajustes.norma_area(area))
         filas = reglas + [{"area": "", "solo_local": False, "capturas": True, "playbooks_bloqueados": []}] * 2
@@ -2105,14 +2379,24 @@ def montar(app: FastAPI, cfg: dict) -> None:
                 "(SELECT count(*) FROM sesiones_persona s WHERE s.persona_id = pe.id) AS sesiones "
                 "FROM personas pe WHERE pe.empresa_id = %s ORDER BY pe.activo DESC, pe.email", (eid,)).fetchall()
             recargas = c.execute("SELECT * FROM recargas WHERE empresa_id = %s ORDER BY id DESC LIMIT 50", (eid,)).fetchall()
+            r = resumen_empresa(c, eid)
         accion = lambda a: f"/consola/admin/empresas/{eid}/{a}"
+        sistemas = " · ".join(f"{n} {s}" for s, n in (("Linux", r["linux"]), ("Windows", r["windows"])) if n)
         cifras = ('<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">'
-                  + cifra("Personas", str(f["personas"]), f'{f["equipos"]} equipos activos', "usuario")
-                  + cifra("Casos del mes", str(f["casos_mes"]), f'IA del mes: {usd(f["mes"])}', "casos")
-                  + (cifra("Fondo de IA", usd(f["saldo"]), f"≈ {atenciones(f):,} atenciones más", "dinero",
+                  + cifra("Equipos en línea", f'{r["en_linea"]} / {f["equipos"]}',
+                          (f'{r["sin_senal"]} sin señal' if r["sin_senal"] else "Ninguno sin señal") + (f" · {sistemas}" if sistemas else ""),
+                          "equipo", "text-peligro" if r["sin_senal"] else "")
+                  + cifra("Escalados abiertos", str(r["escalados"]), f'{r["vencidos"]} fuera de tiempo' if r["vencidos"]
+                          else "Ninguno fuera de tiempo", "escalar", "text-peligro" if r["vencidos"] else "")
+                  + cifra("Satisfacción", f'{r["satisfaccion"]:.1f} / 5' if r["satisfaccion"] else "—",
+                          f'Últimos 30 días · {r["resueltos_n1"]} resueltos por Helpert sin soporte humano', "estrella")
+                  + (cifra("Fondo de IA", usd(f["saldo"]), f"≈ {atenciones(f):,} atenciones más · IA del mes: {usd(f['mes'])}", "dinero",
                            "text-peligro" if float(f["saldo"]) < float(f["alerta_usd"]) else "")
-                     if f["fondo_activo"] else cifra("Fondo de IA", "Sin límite", "El fondo no está activo", "dinero"))
-                  + cifra("Tiempo de respuesta", f'{f["sla_n2_min"] // 60} h / {f["sla_n3_min"] // 60} h', "N2 / N3", "reloj")
+                     if f["fondo_activo"] else cifra("Fondo de IA", "Sin límite", f"El fondo no está activo · IA del mes: {usd(f['mes'])}", "dinero"))
+                  + cifra("Personas", str(f["personas"]), "Pueden pedir ayuda desde la bandeja", "usuario")
+                  + cifra("Casos del mes", str(f["casos_mes"]), "Desde el día 1", "casos")
+                  + cifra("Tiempo de respuesta", f'{duracion(f["sla_n2_min"] * 60)} / {duracion(f["sla_n3_min"] * 60)}', "N2 / N3", "reloj")
+                  + cifra("Cuentas de la consola", str(r["cuentas"]), "Administración, analistas, técnicos y gerencia", "llave")
                   + '</div>')
         remoto = "".join(f'<option value="{v}"{" selected" if (f["remoto"] or "") == v else ""}>{t}</option>'
                          for v, t in (("", "Ninguno"), ("rustdesk", "RustDesk"), ("anydesk", "AnyDesk")))
@@ -2203,6 +2487,9 @@ def montar(app: FastAPI, cfg: dict) -> None:
                         + campo("nombre", "Nombre", "", "", "text", 'maxlength="120"', requerido=False)
                         + f'<button class="btn btn-primario">{icono("mas")}Agregar persona</button></form>')
         enlaces = ('<div class="flex flex-wrap gap-2">'
+                   f'<a class="btn btn-primario btn-sm" href="#personas">{icono("mas")}Agregar persona</a>'
+                   f'<a class="btn btn-borde btn-sm" href="/consola/admin/usuarios">{icono("llave")}Crear cuenta</a>'
+                   f'<a class="btn btn-borde btn-sm" href="/consola/admin/equipos">{icono("equipo")}Equipos</a>'
                    f'<a class="btn btn-borde btn-sm" href="/consola?{urlencode({"estado": "todos", "empresa": eid})}">{icono("casos")}Casos</a>'
                    f'<a class="btn btn-borde btn-sm" href="/consola/metricas?{urlencode({"empresa": eid})}">{icono("metricas")}Métricas</a>'
                    f'<a class="btn btn-borde btn-sm" href="/consola/admin/privacidad?{urlencode({"empresa": eid})}">{icono("candado")}Privacidad</a>'
@@ -2217,10 +2504,12 @@ def montar(app: FastAPI, cfg: dict) -> None:
                                cuerpo_clase="tarjeta-cuerpo grid gap-5") + '</div>'
                      + tarjeta("Personas", "Quienes piden ayuda desde la bandeja. Entran con su correo y un código: por correo si "
                                "el servidor tiene SMTP, o el código de acceso que generas aquí (vale 24 horas, un solo uso).",
-                               form_persona + tabla_personas, cuerpo_clase="tarjeta-cuerpo grid gap-5")
-                     + tarjeta("Sedes", "La persona elige su sede en la bandeja; el técnico la ve en el caso.",
-                               form_sede + (f'<ul class="divide-y text-sm">{lista_sedes}</ul>' if sedes else ""),
-                               cuerpo_clase="tarjeta-cuerpo grid gap-4"))
+                               form_persona + tabla_personas, "scroll-mt-20", "tarjeta-cuerpo grid gap-5", "personas")
+                     + tarjeta("Sedes", "La persona elige su sede en la bandeja; el técnico ve la dirección en su visita.",
+                               form_sede + (f'<ul class="divide-y text-sm">{lista_sedes}</ul>' if sedes else
+                                            '<p class="text-sm text-muted-foreground">Sin sedes: agrega la primera para que el '
+                                            'técnico sepa a dónde ir.</p>'),
+                               "scroll-mt-20", "tarjeta-cuerpo grid gap-4", "sedes"))
         return admin_pagina(p, "empresas", contenido, aviso, secreto, mensaje)
 
     @app.get("/consola/admin/empresas/{eid}", include_in_schema=False)
@@ -2673,7 +2962,7 @@ def montar(app: FastAPI, cfg: dict) -> None:
                                  count(*) FILTER (WHERE estado = 'escalado') AS escalados, coalesce(sum(costo_usd), 0) AS costo,
                                  count(DISTINCT usuario) AS usuarios
                                FROM casos WHERE equipo_id = %s""", (eid,)).fetchone()
-        so = casos[0]["so"].capitalize() if casos and casos[0]["so"] else "—"
+        so = casos[0]["so"] if casos else None
         cifras = ('<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">'
                   + cifra("Casos", str(tot["total"]), f'{tot["usuarios"]} usuarios distintos', "casos")
                   + cifra("Resueltos por Helpert", str(tot["resueltos"]), "Cerrados como resueltos", "ok", "text-exito")
@@ -2698,7 +2987,7 @@ def montar(app: FastAPI, cfg: dict) -> None:
         estado = (insignia("Revocado", "peligro", "prohibido") if q["revocado"] else insignia("Habilitado", "exito", "ok"))
         ficha_q = ('<dl class="-my-2 divide-y text-sm">' + "".join(
             f'<div class="grid grid-cols-[9rem_1fr] gap-3 py-2.5"><dt class="text-muted-foreground">{t}</dt><dd>{v}</dd></div>'
-            for t, v in (("Estado", estado), ("Sistema", e((q["so"] or "").capitalize() or so)),
+            for t, v in (("Estado", estado), ("Sistema", e(sistema(q["so"] or so))),
                          ("Control remoto", f'<span class="codigo select-all">{e(q["remoto"])}</span>' if q["remoto"] else "—"),
                          ("Versión del agente", e(q["version"])),
                          ("Piloto", "Sí: recibe primero las versiones nuevas" if q["piloto"] else "No"),
