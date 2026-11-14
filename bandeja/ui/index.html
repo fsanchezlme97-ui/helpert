@@ -134,7 +134,15 @@
 </section>
 </div>
 
-<p id="sin-servicio" class="m-auto max-w-72 px-6 text-center text-sm text-peligro" role="alert" hidden></p>
+<!-- El servicio del equipo no responde (p. ej. se reinicia tras actualizarse): se reintenta solo cada 5 s. -->
+<section id="sin-servicio" class="m-auto flex max-w-72 flex-col items-center px-6 text-center" role="alert" hidden>
+  <picture><source media="(prefers-color-scheme: dark)" srcset="marca-oscuro.png"><img src="marca.png" alt="" class="h-16 w-auto opacity-60 grayscale"></picture>
+  <h1 class="mt-4 text-base font-semibold">Helpert no está disponible ahora</h1>
+  <p class="mt-1 text-sm text-balance text-muted-foreground">El servicio de este equipo no responde. Lo vuelvo a intentar solo; si sigue así unos minutos, reinicia el equipo o llama a soporte.</p>
+  <button type="button" id="reintentar" class="btn btn-borde btn-sm mt-5">Reintentar ahora</button>
+  <details class="mt-4 w-full text-left text-xs text-muted-foreground"><summary class="cursor-pointer text-center">Detalle para soporte</summary>
+    <p id="sin-servicio-detalle" class="mt-2 break-words font-mono"></p></details>
+</section>
 <script src="app.js"></script>
 </body>
 </html>

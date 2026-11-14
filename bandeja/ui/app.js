@@ -254,6 +254,15 @@ function mostrarVista(v) {
 for (const b of document.querySelectorAll("[data-vista]")) b.addEventListener("click", () => mostrarVista(b.dataset.vista));
 
 let reintento = null;
+$("reintentar").addEventListener("click", estado);
+// Mientras se espera al servidor, el botón del formulario no se puede pulsar otra vez (no se piden dos códigos).
+async function conBoton(form, accion) {
+  const b = form.querySelector("button:not([type=button])");
+  const antes = b.textContent;
+  b.disabled = true;
+  b.textContent = "Un momento…";
+  try { return await accion(); } finally { b.disabled = false; b.textContent = antes; }
+}
 async function estado() {
   const r = await cuentaPet("estado");
   if (r.error) {
@@ -263,7 +272,7 @@ async function estado() {
     if (!$("vista-app").hidden) return;
     $("vista-entrar").hidden = true;
     $("sin-servicio").hidden = false;
-    $("sin-servicio").textContent = r.error;
+    $("sin-servicio-detalle").textContent = r.error;
     return;
   }
   $("sin-servicio").hidden = true;
@@ -285,7 +294,7 @@ $("form-correo").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   correoActual = $("correo").value.trim();
   $("entrar-error").textContent = "";
-  const r = await cuentaPet("codigo", { email: correoActual });
+  const r = await conBoton($("form-correo"), () => cuentaPet("codigo", { email: correoActual }));
   if (r.error) { $("entrar-error").textContent = r.error; return; }
   $("codigo-ayuda").textContent = r.respuesta;
   $("form-correo").hidden = true;
@@ -294,7 +303,7 @@ $("form-correo").addEventListener("submit", async (ev) => {
 });
 $("form-codigo").addEventListener("submit", async (ev) => {
   ev.preventDefault();
-  const r = await cuentaPet("entrar", { email: correoActual, codigo: $("codigo").value.trim() });
+  const r = await conBoton($("form-codigo"), () => cuentaPet("entrar", { email: correoActual, codigo: $("codigo").value.trim() }));
   if (r.error) { $("entrar-error").textContent = r.error; $("codigo").select(); return; }
   $("codigo").value = "";
   $("form-codigo").hidden = true;
@@ -390,7 +399,7 @@ function pintarPerfil() {
 }
 $("form-perfil").addEventListener("submit", async (ev) => {
   ev.preventDefault();
-  const r = await cuentaPet("perfil", { nombre: $("p-nombre").value, telefono: $("p-telefono").value, sede: $("p-sede").value });
+  const r = await conBoton($("form-perfil"), () => cuentaPet("perfil", { nombre: $("p-nombre").value, telefono: $("p-telefono").value, sede: $("p-sede").value }));
   $("perfil-ok").className = r.error ? "text-sm text-peligro" : "text-sm text-exito";
   $("perfil-ok").textContent = r.error || "Guardado";
   if (!r.error) await estado();
