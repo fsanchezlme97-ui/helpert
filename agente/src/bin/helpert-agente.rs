@@ -568,8 +568,9 @@ mod servicio {
     /// ProgramData deja a cualquier usuario crear carpetas: si no existe, se crea ya con sus permisos (solo SYSTEM y
     /// Administradores, sin herencia), en la misma llamada, para que nadie alcance a dejar nada dentro; si existe y es un
     /// enlace o no es de SYSTEM ni de Administradores (alguien la creó antes de instalar), el servicio no arranca: el
-    /// instalador la borra y la crea de nuevo. Dentro, tmp se crea de nuevo y el registro anterior se renombra antes de
-    /// crear uno nuevo, sin abrir lo que hubiera.
+    /// instalador la borra y la crea de nuevo. Si es de ellos, se le vuelven a fijar esos permisos (sin herencia). Dentro,
+    /// tmp se crea de nuevo con los mismos permisos y el registro anterior se renombra antes de crear uno nuevo, sin
+    /// abrir lo que hubiera.
     fn proteger_carpeta() -> Result<(), String> {
         use std::os::windows::fs::MetadataExt;
         use windows_sys::Win32::Foundation::{LocalFree, ERROR_SUCCESS};
@@ -584,32 +585,45 @@ mod servicio {
             return Err("descriptor de seguridad".into());
         }
         let sa = SECURITY_ATTRIBUTES { nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32, lpSecurityDescriptor: sd, bInheritHandle: 0 };
-        unsafe {
-            CreateDirectoryW(ruta.as_ptr(), &sa); // si ya existe, falla y se revisa abajo
-            LocalFree(sd as _);
-        }
-        let m = std::fs::symlink_metadata(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-        if m.file_attributes() & 0x400 != 0 || !m.is_dir() {
-            return Err(format!("{} es un enlace o no es una carpeta; reinstala Helpert", dir.display()));
-        }
-        let (mut dueno, mut sd_actual) = (std::ptr::null_mut(), std::ptr::null_mut());
-        let r = unsafe {
-            GetNamedSecurityInfoW(ruta.as_ptr(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &mut dueno,
-                                  std::ptr::null_mut(), std::ptr::null_mut(), std::ptr::null_mut(), &mut sd_actual)
-        };
-        let de_admin = r == ERROR_SUCCESS
-            && unsafe { IsWellKnownSid(dueno, WinLocalSystemSid) != 0 || IsWellKnownSid(dueno, WinBuiltinAdministratorsSid) != 0 };
-        if !sd_actual.is_null() {
-            unsafe { LocalFree(sd_actual as _) };
-        }
-        if !de_admin {
-            return Err(format!("{} no es de SYSTEM ni de Administradores; reinstala Helpert", dir.display()));
-        }
-        let tmp = dir.join("tmp");
-        let _ = std::fs::remove_dir_all(&tmp); // si es un enlace, borra el enlace, no lo que apunta
-        std::fs::create_dir(&tmp).map_err(|e| format!("{}: {e}", tmp.display()))?;
-        let _ = std::fs::rename(dir.join("agente.log"), dir.join("agente.anterior.log"));
-        Ok(())
+        unsafe { CreateDirectoryW(ruta.as_ptr(), &sa) }; // si ya existe, falla y se revisa abajo
+        let resultado = (|| {
+            let m = std::fs::symlink_metadata(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+            if m.file_attributes() & 0x400 != 0 || !m.is_dir() {
+                return Err(format!("{} es un enlace o no es una carpeta; reinstala Helpert", dir.display()));
+            }
+            let (mut dueno, mut sd_actual) = (std::ptr::null_mut(), std::ptr::null_mut());
+            let r = unsafe {
+                GetNamedSecurityInfoW(ruta.as_ptr(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &mut dueno,
+                                      std::ptr::null_mut(), std::ptr::null_mut(), std::ptr::null_mut(), &mut sd_actual)
+            };
+            let de_admin = r == ERROR_SUCCESS
+                && unsafe { IsWellKnownSid(dueno, WinLocalSystemSid) != 0 || IsWellKnownSid(dueno, WinBuiltinAdministratorsSid) != 0 };
+            if !sd_actual.is_null() {
+                unsafe { LocalFree(sd_actual as _) };
+            }
+            if !de_admin {
+                return Err(format!("{} no es de SYSTEM ni de Administradores; reinstala Helpert", dir.display()));
+            }
+            let (mut presente, mut dacl, mut por_defecto) = (0, std::ptr::null_mut(), 0);
+            let r = unsafe {
+                GetSecurityDescriptorDacl(sd, &mut presente, &mut dacl, &mut por_defecto);
+                SetNamedSecurityInfoW(ruta.as_ptr(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
+                                      std::ptr::null_mut(), std::ptr::null_mut(), dacl, std::ptr::null())
+            };
+            if r != ERROR_SUCCESS {
+                return Err(format!("{}: no pude fijar sus permisos (error {r})", dir.display()));
+            }
+            let tmp = dir.join("tmp");
+            let _ = std::fs::remove_dir_all(&tmp); // si es un enlace, borra el enlace, no lo que apunta
+            let ancho_tmp: Vec<u16> = std::os::windows::ffi::OsStrExt::encode_wide(tmp.as_os_str()).chain([0]).collect();
+            if unsafe { CreateDirectoryW(ancho_tmp.as_ptr(), &sa) } == 0 {
+                return Err(format!("{}: {}", tmp.display(), std::io::Error::last_os_error()));
+            }
+            let _ = std::fs::rename(dir.join("agente.log"), dir.join("agente.anterior.log"));
+            Ok(())
+        })();
+        unsafe { LocalFree(sd as _) };
+        resultado
     }
 
     fn carpeta() -> std::path::PathBuf {
