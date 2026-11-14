@@ -100,6 +100,7 @@ if [ -n "$BANDEJA" ]; then
   pkill -x helpert-bandeja 2>/dev/null || true  # la versión anterior; el instalador abre la nueva como el usuario
   install -Dm755 "$BANDEJA" /usr/local/bin/helpert-bandeja
   install -Dm644 "$ICONO" /usr/share/icons/hicolor/256x256/apps/helpert.png
+  rm -f /usr/share/icons/hicolor/scalable/apps/helpert.svg  # icono de versiones anteriores: el tema lo prefería al PNG
   ENTRADA='[Desktop Entry]
 Type=Application
 Name=Helpert
