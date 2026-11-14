@@ -565,56 +565,45 @@ mod servicio {
     }
 
     /// ProgramData\Helpert guarda la configuración con el token, el registro y la carpeta temporal de los scripts.
-    /// ProgramData deja a cualquier usuario crear carpetas: si la carpeta es un enlace o no es de SYSTEM ni de
-    /// Administradores (alguien la creó antes de instalar), el servicio no arranca; el instalador la borra y la crea de
-    /// nuevo. Si es de ellos, en cada arranque se le restablecen los permisos a ella y a todo lo que tiene dentro (sin
-    /// herencia de ProgramData: solo SYSTEM y Administradores), tmp se crea de nuevo y el registro anterior se renombra
-    /// antes de crear uno nuevo.
+    /// ProgramData deja a cualquier usuario crear carpetas: si no existe, se crea ya con sus permisos (solo SYSTEM y
+    /// Administradores, sin herencia), en la misma llamada, para que nadie alcance a dejar nada dentro; si existe y es un
+    /// enlace o no es de SYSTEM ni de Administradores (alguien la creó antes de instalar), el servicio no arranca: el
+    /// instalador la borra y la crea de nuevo. Dentro, tmp se crea de nuevo y el registro anterior se renombra antes de
+    /// crear uno nuevo, sin abrir lo que hubiera.
     fn proteger_carpeta() -> Result<(), String> {
         use std::os::windows::fs::MetadataExt;
         use windows_sys::Win32::Foundation::{LocalFree, ERROR_SUCCESS};
         use windows_sys::Win32::Security::Authorization::*;
         use windows_sys::Win32::Security::*;
+        use windows_sys::Win32::Storage::FileSystem::CreateDirectoryW;
         let dir = carpeta();
-        let _ = std::fs::create_dir(&dir);
+        let ruta: Vec<u16> = std::os::windows::ffi::OsStrExt::encode_wide(dir.as_os_str()).chain([0]).collect();
+        let sddl: Vec<u16> = "O:SYD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)".encode_utf16().chain([0]).collect();
+        let mut sd = std::ptr::null_mut();
+        if unsafe { ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.as_ptr(), SDDL_REVISION_1, &mut sd, std::ptr::null_mut()) } == 0 {
+            return Err("descriptor de seguridad".into());
+        }
+        let sa = SECURITY_ATTRIBUTES { nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32, lpSecurityDescriptor: sd, bInheritHandle: 0 };
+        unsafe {
+            CreateDirectoryW(ruta.as_ptr(), &sa); // si ya existe, falla y se revisa abajo
+            LocalFree(sd as _);
+        }
         let m = std::fs::symlink_metadata(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         if m.file_attributes() & 0x400 != 0 || !m.is_dir() {
             return Err(format!("{} es un enlace o no es una carpeta; reinstala Helpert", dir.display()));
         }
-        let ancho = |t: &str| t.encode_utf16().chain([0]).collect::<Vec<u16>>();
-        let ruta: Vec<u16> = std::os::windows::ffi::OsStrExt::encode_wide(dir.as_os_str()).chain([0]).collect();
-        let (mut actual, mut sd_actual) = (std::ptr::null_mut(), std::ptr::null_mut());
+        let (mut dueno, mut sd_actual) = (std::ptr::null_mut(), std::ptr::null_mut());
         let r = unsafe {
-            GetNamedSecurityInfoW(ruta.as_ptr(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &mut actual,
+            GetNamedSecurityInfoW(ruta.as_ptr(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &mut dueno,
                                   std::ptr::null_mut(), std::ptr::null_mut(), std::ptr::null_mut(), &mut sd_actual)
         };
         let de_admin = r == ERROR_SUCCESS
-            && unsafe { IsWellKnownSid(actual, WinLocalSystemSid) != 0 || IsWellKnownSid(actual, WinBuiltinAdministratorsSid) != 0 };
+            && unsafe { IsWellKnownSid(dueno, WinLocalSystemSid) != 0 || IsWellKnownSid(dueno, WinBuiltinAdministratorsSid) != 0 };
         if !sd_actual.is_null() {
             unsafe { LocalFree(sd_actual as _) };
         }
         if !de_admin {
             return Err(format!("{} no es de SYSTEM ni de Administradores; reinstala Helpert", dir.display()));
-        }
-        let mut sd = std::ptr::null_mut();
-        let sddl = ancho("O:SYD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)");
-        if unsafe { ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.as_ptr(), SDDL_REVISION_1, &mut sd, std::ptr::null_mut()) } == 0 {
-            return Err("descriptor de seguridad".into());
-        }
-        let (mut dueno, mut dacl, mut d1, mut d2) = (std::ptr::null_mut(), std::ptr::null_mut(), 0, 0);
-        let r = unsafe {
-            GetSecurityDescriptorOwner(sd, &mut dueno, &mut d1);
-            GetSecurityDescriptorDacl(sd, &mut d2, &mut dacl, &mut d1);
-            // también a lo que hay dentro, sin conservar permisos propios de cada archivo (KeepExplicit = FALSE)
-            let r = TreeResetNamedSecurityInfoW(ruta.as_ptr(), SE_FILE_OBJECT,
-                                                OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
-                                                dueno, std::ptr::null_mut(), dacl, std::ptr::null(), 0, None, ProgressInvokeNever,
-                                                std::ptr::null());
-            LocalFree(sd as _);
-            r
-        };
-        if r != ERROR_SUCCESS {
-            return Err(format!("{}: no pude fijar sus permisos (error {r})", dir.display()));
         }
         let tmp = dir.join("tmp");
         let _ = std::fs::remove_dir_all(&tmp); // si es un enlace, borra el enlace, no lo que apunta
