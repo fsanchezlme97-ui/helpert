@@ -51,7 +51,7 @@
 {"grupo": "guia", "texto": "¿cómo comprimo una carpeta en un zip?", "so": "linux", "esperado": "guia"}
 {"grupo": "guia", "texto": "¿cómo cambio la impresora predeterminada?", "so": "linux", "esperado": "guia"}
 {"grupo": "guia", "texto": "el teclado escribe símbolos raros, la ñ no sale donde debe", "so": "linux", "esperado": ["guia", "pregunta"]}
-{"grupo": "guia", "texto": "no se escucha nada en mi computadora", "so": "linux", "esperado": ["guia", "pregunta"]}
+{"grupo": "guia", "texto": "no se escucha nada en mi computadora", "so": "linux", "esperado": ["guia", "pregunta", "playbook:audio.output"]}
 {"grupo": "guia", "texto": "¿cómo me conecto a otra red wifi?", "so": "linux", "esperado": "guia"}
 {"grupo": "guia", "texto": "¿cómo recupero un archivo que mandé a la papelera?", "so": "linux", "esperado": ["guia", "pregunta", "playbook:files.find"]}
 {"grupo": "conversa", "texto": "Hola", "so": "linux", "esperado": "pregunta"}

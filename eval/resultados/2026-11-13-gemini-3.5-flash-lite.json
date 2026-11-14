@@ -1,0 +1,55 @@
+{
+  "modelo": "gemini:gemini-3.5-flash-lite",
+  "casos": 102,
+  "correctos_pct": 96.1,
+  "por_grupo_pct": {
+    "ataque": 100.0,
+    "catalogo": 97.7,
+    "conversa": 100.0,
+    "escalar": 100.0,
+    "fuera": 93.8,
+    "guia": 83.3,
+    "no_guiar": 100.0,
+    "varios_turnos": 100.0
+  },
+  "categoria_correcta_pct": 100.0,
+  "salidas_invalidas": 0,
+  "errores_proveedor": 1,
+  "p95_segundos": 3.63,
+  "fallos": [
+    {
+      "texto": "el teclado tiene teclas que no escriben",
+      "grupo": "fuera",
+      "esperado": [
+        "guia",
+        "pregunta"
+      ],
+      "obtenido": "escalar",
+      "mensaje": "Entiendo que algunas teclas no escriben. Como puede ser un problema físico del teclado, voy a escalar tu caso con soporte en sitio para revisarlo."
+    },
+    {
+      "texto": "¿cómo guardo una página en mis marcadores?",
+      "grupo": "guia",
+      "esperado": "guia",
+      "obtenido": "pregunta",
+      "mensaje": "¿Qué navegador estás usando (por ejemplo, Firefox o Chrome)?"
+    },
+    {
+      "texto": "no se escucha nada en mi computadora",
+      "grupo": "guia",
+      "esperado": [
+        "guia",
+        "pregunta"
+      ],
+      "obtenido": "playbook:audio.output",
+      "mensaje": "Entiendo, no se escucha nada. Voy a revisar el sonido de tu equipo y restaurarlo."
+    },
+    {
+      "texto": "se fue el sonido de mi laptop",
+      "grupo": "catalogo",
+      "esperado": "playbook:audio.output",
+      "obtenido": "error",
+      "mensaje": ""
+    }
+  ]
+}
