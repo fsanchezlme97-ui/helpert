@@ -1,10 +1,12 @@
+<p align="center"><img src="bandeja/iconos/mascota-original.png" alt="Helpert, asistente de soporte TI con IA" width="720"></p>
+
 # Helpert
 
 Asistente de soporte TI Nivel 1. El plan completo está en [Helpert_Plan_de_desarrollo.md](Helpert_Plan_de_desarrollo.md).
 
-Estado: versión multiempresa funcionando en Linux. Incluye servidor, agente (servicio systemd), bandeja con inicio de sesión, chat, historial, ayuda y perfil, instalador de un archivo, 4 playbooks y consola web con casos por nivel (N1 Helpert, N2 en sitio, N3 analista), empresas con fondo de IA, métricas configurables con exportación CSV y administración, sobre PostgreSQL. Windows viene después.
+Estado: versión multiempresa funcionando en Linux. Incluye servidor, agente (servicio systemd), bandeja con inicio de sesión, chat, historial, ayuda y perfil, instalador de un archivo, 18 playbooks (Linux) y consola web con casos por nivel (N1 Helpert, N2 en sitio, N3 analista), empresas con fondo de IA, métricas configurables con exportación CSV y administración, sobre PostgreSQL. Windows viene después.
 
-Infraestructura: en la nube. El servidor y la consola van en una VPS detrás de Caddy (HTTPS); los datos, en Supabase (PostgreSQL). La IA principal es una API en la nube y Ollama es el respaldo.
+Infraestructura: en la nube. El servidor y la consola van en una VPS detrás de Caddy (HTTPS); los datos, en Supabase (PostgreSQL). La IA principal es Gemini (API de Google) y Ollama es el respaldo.
 
 ## Piezas
 
