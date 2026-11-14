@@ -28,6 +28,10 @@ EJEMPLOS = {
     "Hardware": "pantalla, teclado, mouse, periféricos, equipo nuevo",
     "Software": "instalación, actualización, error de aplicación",
 }
+# Contexto de Ollama por defecto: el catálogo entero va en las instrucciones (~100 playbooks ≈ 11 000 tokens) y un
+# contexto más corto lo corta sin avisar. Lo vigila test_catalogo_cabe_en_el_contexto.
+CONTEXTO = 16384
+CATALOGO_MAX = 34000  # caracteres de las instrucciones con el catálogo de un sistema: unos 11 500 tokens
 CATEGORIAS = tuple(EJEMPLOS)  # las de fábrica; Administración → Categorías puede cambiarlas
 
 
@@ -135,7 +139,7 @@ def esquema(categorias) -> dict:
 def llamar_ollama(cfg: dict, mensajes: list[dict]) -> str:
     url = cfg.get("url", "http://localhost:11434").rstrip("/") + "/api/chat"
     cuerpo = {"model": cfg["modelo"], "messages": mensajes, "stream": False, "think": False, "keep_alive": "30m",
-              "options": {"temperature": 0, "num_ctx": int(cfg.get("contexto", 8192))}}
+              "options": {"temperature": 0, "num_ctx": int(cfg.get("contexto", CONTEXTO))}}
     if not cfg.get("libre"):  # texto libre: la descripción de una captura
         cuerpo["format"] = cfg.get("esquema") or esquema(CATEGORIAS)
     r = _post(url, cuerpo, {}, cfg.get("timeout", 60))

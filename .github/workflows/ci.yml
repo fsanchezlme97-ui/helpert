@@ -22,6 +22,18 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: cd server && uv run pytest -q
       - run: cd agente && cargo test -q
+      - name: Scripts de los playbooks (como root, con aplicar en esta máquina desechable)
+        run: python3 playbooks/probar-unix.py --root --aplicar
+
+  macos:  # no hay agente para macOS todavía: aquí solo se prueban los scripts macos.sh (bash 3.2, herramientas BSD)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Scripts de los playbooks (como root, con aplicar en esta máquina desechable)
+        run: python playbooks/probar-unix.py --root --aplicar
 
   windows:
     runs-on: windows-latest
@@ -38,7 +50,7 @@ jobs:
           cd bandeja; cargo test -q; cargo build --release -q
       - name: Scripts de los playbooks (PowerShell 5.1)
         shell: powershell
-        run: .\playbooks\probar-windows.ps1
+        run: .\playbooks\probar-windows.ps1 -Aplicar
       - name: Servicio, tubería y servidor de punta a punta
         run: .\despliegue\probar-windows-ci.ps1
       - uses: actions/upload-artifact@v4

@@ -1,3 +1,4 @@
+import helpert_server.app as app_mod
 from helpert_server import db, ia
 from conftest import RAIZ, contrato
 
@@ -154,6 +155,7 @@ def test_sin_ia_ofrece_menu(servidor):
     r = enviar(cli)
     numero = {l.split(". ", 1)[1]: l.split(".")[0] for l in r["respuesta"].splitlines() if ". " in l}
     assert r["estado"] == "menu" and "Liberar espacio en disco" in numero
+    assert sum(v.isdigit() for v in numero.values()) <= app_mod.MENU_MAX + 1  # con ~100 playbooks, solo los más comunes y «0. Pasar mi caso a soporte»
     assert "Buscar un archivo" not in numero  # necesita un nombre que sin IA no se puede pedir
     r = enviar(cli, numero["Liberar espacio en disco"], r["caso_id"])
     assert r["trabajo"]["playbook"] == "disk.free-space"

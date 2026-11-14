@@ -1990,7 +1990,7 @@ def montar(app: FastAPI, cfg: dict) -> None:
             + campo("clave_env", "O variable de entorno", var, "", "text",
                     'maxlength="60" placeholder="HELPERT_IA_CLAVE"', f"p{pid}-env", requerido=False)
             + campo("timeout", "Tiempo máximo (s)", x.get("timeout", 60), "", "number", 'min="5" max="300"', f"p{pid}-timeout")
-            + campo("contexto", "Contexto (solo Ollama)", x.get("contexto", 8192), "", "number", 'min="1024" max="131072"', f"p{pid}-ctx")
+            + campo("contexto", "Contexto (solo Ollama)", x.get("contexto", 16384), "", "number", 'min="1024" max="131072"', f"p{pid}-ctx")
             + campo("precio_entrada", "Precio entrada (US$/M tokens)", x.get("precio_entrada", ""), "", "number",
                     'step="0.001" min="0" max="1000" placeholder="0"', f"p{pid}-pe", requerido=False)
             + campo("precio_salida", "Precio salida (US$/M tokens)", x.get("precio_salida", ""), "", "number",
@@ -2726,7 +2726,7 @@ def montar(app: FastAPI, cfg: dict) -> None:
              "precio_entrada": d.get("precio_entrada", "").strip(), "precio_salida": d.get("precio_salida", "").strip(),
              "tareas": [t for t in ajustes.TAREAS if d.get(f"tarea_{t}") == "1"], "local": d.get("local") == "1"}
         if x["proveedor"] == "ollama":
-            x["contexto"] = d.get("contexto", 8192)
+            x["contexto"] = d.get("contexto", 16384)
         return {k: v for k, v in x.items() if v != ""}
 
     def cambiar_cadena(p, d, i, accion):

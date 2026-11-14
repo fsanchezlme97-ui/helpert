@@ -107,6 +107,12 @@ def correo(cfg: dict, para: str, asunto: str, texto: str) -> bool:
     return True
 
 
+MENU_MAX = 12  # opciones del menú sin IA, además de «0. Pasar mi caso a soporte»
+MENU_PRIMERO = ("net.no-internet", "net.wifi", "print.clear-queue", "disk.free-space", "system.slow", "audio.output",
+                "audio.mic", "camera.check", "usb.storage", "browser.cache", "time.sync", "net.vpn", "net.network-drive",
+                "bluetooth.restart", "system.restart")
+
+
 def crear_app(cfg: dict) -> FastAPI:
     ruta = cfg["base_datos"]  # DSN de PostgreSQL
     db.iniciar(ruta)
@@ -340,8 +346,12 @@ def crear_app(cfg: dict) -> FastAPI:
     def opciones(c, so, area, empresa_id=None):
         aj = ajustes.leer(c, cfg, empresa_id)
         activos = ajustes.catalogo_activo(catalogo, aj, ajustes.regla_de(aj, area))
-        # el menú sin IA no puede pedir datos: quedan fuera los playbooks con parámetros obligatorios (p. ej. files.find)
-        return [pb for pb in activos.values() if so in pb.sistemas and not any(r.get("requerido") for r in pb.parametros.values())]
+        # el menú sin IA no puede pedir datos: quedan fuera los playbooks con parámetros obligatorios (p. ej. files.find).
+        # Con ~100 playbooks no caben todos: los problemas más comunes primero, en un orden fijo (el número que la
+        # persona escribe debe seguir siendo la misma opción), y el resto por nombre hasta MENU_MAX.
+        validos = [pb for pb in activos.values() if so in pb.sistemas and not any(r.get("requerido") for r in pb.parametros.values())]
+        rango = {i: n for n, i in enumerate(MENU_PRIMERO)}
+        return sorted(validos, key=lambda pb: (rango.get(pb.id, len(rango)), pb.nombre))[:MENU_MAX]
 
     def menu(c, caso_id, so, area, intro, empresa_id=None):
         actualizar(c, caso_id, estado="menu")

@@ -98,7 +98,7 @@ def _proveedor(p: dict, claves_iniciales: set[str], tipos_iniciales: set[str]) -
         if p.get(k) not in (None, ""):
             limpio[k] = _numero(p[k], 0, 1000)
     if p["proveedor"] == "ollama":
-        limpio["contexto"] = _numero(p.get("contexto", 8192), 1024, 131072, entero=True)
+        limpio["contexto"] = _numero(p.get("contexto", 16384), 1024, 131072, entero=True)
     return limpio
 
 

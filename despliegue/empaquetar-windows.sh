@@ -42,7 +42,9 @@ for exe in helpert-agente.exe helpert.exe helpert-bandeja.exe; do
   cp "$f" "$D/p/bin/"
 done
 cp -r "$RAIZ/playbooks" "$D/p/playbooks"
-rm -f "$D"/p/playbooks/*.ps1 "$D"/p/playbooks/*/linux.sh  # la prueba de CI y los scripts de Linux no van
+# solo se quitan las pruebas de la raíz: la firma cubre cada archivo de la carpeta del playbook (también linux.sh y
+# macos.sh), así que quitarlos haría que el agente rechace el paquete. El agente solo corre el script de su sistema.
+rm -f "$D"/p/playbooks/*.ps1 "$D"/p/playbooks/*.sh "$D"/p/playbooks/*.py
 cp "$PUB" "$D/p/playbooks.pub"
 printf '%s\r\n' "$SERVIDOR" > "$D/p/servidor.txt"
 (umask 077; cp "$INSCRIPCION_F" "$D/p/inscripcion")

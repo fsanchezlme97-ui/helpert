@@ -8,12 +8,21 @@
 #    HP_PASO, HP_USUARIO (quien corre la prueba) y los parámetros requeridos con un valor de ejemplo del manifiesto.
 #    Debe salir con 0, 1, 3 o 10, en menos de 120 s, con texto y sin caracteres dañados (U+FFFD) al leerlo como UTF-8.
 #    Un 1 que viene del catch general («Algo salió mal...») también cuenta como falla: es un error, no un mensaje.
+# 4. Con -Aplicar (solo en la CI, máquinas desechables): si diagnosticar dice que hay algo que hacer, también corren
+#    comprobar → aplicar → verificar, salvo los que dejarían a la máquina sin red o la reiniciarían ($NO_APLICAR).
 # Este archivo lleva BOM para que 5.1 lo lea bien con -File.
+param([switch]$Aplicar)
 $ErrorActionPreference = 'Stop'
+$NO_APLICAR = '^(net\.|system\.restart|system\.update|app\.update|app\.office-(repair|update)|security\.firewall|time\.sync|domain\.|bluetooth\.)'
 $raiz = Split-Path -Parent $MyInvocation.MyCommand.Path
 $estricto = New-Object System.Text.UTF8Encoding($false, $true)
 $utf8 = New-Object System.Text.UTF8Encoding $false
-$encabezado = '[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false; $OutputEncoding = [Console]::OutputEncoding' + "`n"
+# la misma cabecera que pone el agente (sin cmdlets: cargarlos sin caché completa tarda 18-28 s)
+$encabezado = "`$ProgressPreference = 'SilentlyContinue'`n[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new(`$false)`n`$OutputEncoding = [Console]::OutputEncoding`n"
+# carpetas como las del agente: temporal y caché de módulos propias
+$datos = Join-Path $env:ProgramData 'HelpertPrueba'
+$tmp = Join-Path $datos 'tmp'; $cache = Join-Path $datos 'powershell'
+New-Item -ItemType Directory -Force $tmp, $cache | Out-Null
 $fallos = New-Object System.Collections.Generic.List[string]
 function Falla($texto) { $fallos.Add($texto); Write-Host "FALLA  $texto" }
 
@@ -57,18 +66,22 @@ function Ejecutar($texto, $variables) {
   $psi.StandardOutputEncoding = $utf8; $psi.StandardErrorEncoding = $utf8
   # el mismo entorno mínimo que da el agente
   $psi.EnvironmentVariables.Clear()
-  foreach ($k in 'SystemRoot', 'windir', 'SystemDrive', 'ProgramData', 'ProgramFiles', 'COMPUTERNAME') {
-    $psi.EnvironmentVariables[$k] = [Environment]::GetEnvironmentVariable($k)
+  foreach ($k in 'SystemRoot', 'windir', 'SystemDrive', 'ProgramData', 'ProgramFiles', 'ProgramFiles(x86)', 'ProgramW6432',
+                 'CommonProgramFiles', 'CommonProgramFiles(x86)', 'COMPUTERNAME', 'PATHEXT', 'NUMBER_OF_PROCESSORS',
+                 'PROCESSOR_ARCHITECTURE', 'OS', 'ALLUSERSPROFILE', 'PUBLIC') {
+    $v = [Environment]::GetEnvironmentVariable($k); if ($v) { $psi.EnvironmentVariables[$k] = $v }
   }
-  $psi.EnvironmentVariables['PATH'] = [Environment]::GetEnvironmentVariable('Path', 'Machine')
-  $psi.EnvironmentVariables['TEMP'] = Join-Path $env:SystemRoot 'Temp'
-  $psi.EnvironmentVariables['TMP'] = Join-Path $env:SystemRoot 'Temp'
+  $r0 = $env:SystemRoot
+  $psi.EnvironmentVariables['PATH'] = "$r0\System32;$r0;$r0\System32\Wbem;$r0\System32\WindowsPowerShell\v1.0\"
+  $psi.EnvironmentVariables['PSModuleAnalysisCachePath'] = Join-Path $cache 'ModuleAnalysisCache'
+  $psi.EnvironmentVariables['TEMP'] = $tmp
+  $psi.EnvironmentVariables['TMP'] = $tmp
   foreach ($k in $variables.Keys) { $psi.EnvironmentVariables[$k] = $variables[$k] }
   $p = [System.Diagnostics.Process]::Start($psi)
   $p.StandardInput.Close()
   $salida = $p.StandardOutput.ReadToEndAsync(); $error2 = $p.StandardError.ReadToEndAsync()
   $codigoSalida = 124
-  if ($p.WaitForExit(120000)) { $p.WaitForExit(); $codigoSalida = $p.ExitCode } else { try { $p.Kill() } catch { } }
+  if ($p.WaitForExit(600000)) { $p.WaitForExit(); $codigoSalida = $p.ExitCode } else { try { $p.Kill() } catch { } }
   [void]$salida.Wait(5000); [void]$error2.Wait(5000)
   $r = @{ Codigo = $codigoSalida; Salida = ''; Error = '' }
   if ($salida.IsCompleted) { $r.Salida = $salida.Result }
@@ -78,6 +91,10 @@ function Ejecutar($texto, $variables) {
 
 $usuario = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 Write-Host "Usuario: $usuario"
+# como preparar_powershell del agente: la caché completa de módulos, una vez
+$t0 = Get-Date
+$null = Ejecutar '$null = Get-Module -ListAvailable -Refresh; $null = Get-Command -CommandType Cmdlet, Function' @{}
+Write-Host "Caché de módulos lista en $([int]((Get-Date) - $t0).TotalSeconds) s"
 $carpetas = @(Get-ChildItem -LiteralPath $raiz -Directory | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'manifest.toml') } | Sort-Object Name)
 if ($carpetas.Count -eq 0) { Falla 'no encontré ningún playbook'; exit 1 }
 $probados = 0
@@ -118,6 +135,18 @@ foreach ($c in $carpetas) {
   if ($r.Salida.Contains('Algo salió mal y no pude terminar')) { Falla "${id}: diagnosticar terminó en el catch general: $($r.Salida.Trim())"; continue }
   if ($r.Salida.Contains([string][char]0xFFFD)) { Falla "${id}: la salida tiene caracteres dañados (U+FFFD): $($r.Salida.Trim())"; continue }
   Write-Host "ok     ${id}: código $($r.Codigo) en $seg s: $primera"
+  if (-not $Aplicar -or $r.Codigo -ne 0 -or $id -match $NO_APLICAR) { continue }
+  # los pasos que cambian algo, en una máquina desechable: 0, 1 o 3 con su mensaje; nunca el catch general ni 2
+  foreach ($paso in 'comprobar', 'aplicar', 'verificar') {
+    $variables.HP_PASO = $paso
+    $r = Ejecutar $texto $variables
+    $txt = "$($r.Salida)".Trim()
+    if (@(0, 1, 3) -notcontains $r.Codigo -or $txt.Contains('Algo salió mal y no pude terminar') -or $txt.Contains([string][char]0xFFFD)) {
+      Falla "${id}: $paso salió con $($r.Codigo). Salida: $txt Error: $($r.Error.Trim())"; break
+    }
+    Write-Host "         $paso → $($r.Codigo): $(($txt -split "`r?`n")[0])"
+    if ($r.Codigo -ne 0) { break }
+  }
 }
 
 Write-Host ''
