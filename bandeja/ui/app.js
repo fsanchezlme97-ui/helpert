@@ -16,11 +16,16 @@ function el(etiqueta, clase, contenido) {
   return n;
 }
 
-function avatar() {
-  const img = el("img", "mt-0.5 size-7 shrink-0");
-  img.src = "icono.png";
+function avatar() {  // la marca del tema: la oscura con el sistema en modo oscuro
+  const oscura = el("source");
+  oscura.media = "(prefers-color-scheme: dark)";
+  oscura.srcset = "marca-chica-oscuro.png";
+  const img = el("img", "size-7 object-contain");
+  img.src = "marca-chica.png";
   img.alt = "";
-  return img;
+  const p = el("picture", "mt-0.5 flex shrink-0");
+  p.append(oscura, img);
+  return p;
 }
 
 // quien: "tu" | "helpert" | "error"; contenido: texto o nodos.

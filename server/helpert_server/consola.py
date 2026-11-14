@@ -116,8 +116,9 @@ def icono(nombre: str, clase: str = "size-4") -> str:
 
 
 def logo(clase: str = "size-8", alt: str = "") -> str:
-    """Logo: la marca «H>_» sobre un cuadro blanco (se lee igual en los dos temas)."""
-    return f'<img src="{E}/icono.png" alt="{alt}" class="shrink-0 {clase}">'
+    """Logo: la marca «H>_» en su versión para tamaños chicos, clara u oscura según el tema del sistema."""
+    return (f'<picture class="flex shrink-0"><source media="(prefers-color-scheme: dark)" srcset="{E}/marca-chica-oscuro.png">'
+            f'<img src="{E}/marca-chica.png" alt="{alt}" class="object-contain {clase}"></picture>')
 
 
 def insignia(texto: str, variante: str = "neutra", icono_: str = "") -> str:
