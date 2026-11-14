@@ -3,8 +3,8 @@
 # En el equipo: extraer el .zip y doble clic en «Instalar Helpert.cmd» (pide permiso de administrador).
 #   despliegue/empaquetar-windows.sh --servidor https://helpert.empresa.pe --clave-publica playbooks.pub \
 #        --inscripcion-archivo inscripcion.txt [--binarios DIR] [--salida helpert-windows.zip]
-# Los .exe los compila la CI en Windows (artefacto «helpert-windows»); sin --binarios se descarga el de la última
-# ejecución correcta de la rama actual con gh. Aquí solo se juntan con los playbooks firmados (fuera de la VPS y de
+# Los .exe los compila la CI en Windows (artefacto «helpert-windows»); sin --binarios se descarga, con gh, el de la
+# ejecución correcta de la CI para este mismo commit (git rev-parse HEAD), no el de otro. Aquí solo se juntan con los playbooks firmados (fuera de la VPS y de
 # la CI: la clave privada nunca sale de donde se firma). shortcut: el paquete lleva la clave de inscripción de la
 # organización, como el de Linux.
 set -eu
@@ -28,9 +28,10 @@ done
 
 D=$(mktemp -d); trap 'rm -rf "$D"' EXIT
 if [ -z "${BINARIOS:-}" ]; then
-  RAMA=$(git -C "$RAIZ" branch --show-current)
-  RUN=$(gh run list -R "$(git -C "$RAIZ" remote get-url origin)" --workflow ci --branch "$RAMA" --status success --limit 1 --json databaseId -q '.[0].databaseId')
-  [ -n "$RUN" ] || { echo "No hay una ejecución correcta de la CI en $RAMA; usa --binarios DIR."; exit 1; }
+  COMMIT=$(git -C "$RAIZ" rev-parse HEAD)
+  RUN=$(gh run list -R "$(git -C "$RAIZ" remote get-url origin)" --workflow ci --commit "$COMMIT" --event push --status success \
+        --limit 1 --json databaseId -q '.[0].databaseId')
+  [ -n "$RUN" ] || { echo "No hay una ejecución correcta de la CI para $COMMIT (¿subiste el commit?); o usa --binarios DIR."; exit 1; }
   gh run download "$RUN" -R "$(git -C "$RAIZ" remote get-url origin)" -n helpert-windows -D "$D/descarga"
   BINARIOS=$D/descarga
 fi

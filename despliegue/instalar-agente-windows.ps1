@@ -67,17 +67,6 @@ try {
     # archivos descargados de internet: sin la marca que hace que Windows pregunte al abrirlos
     Get-ChildItem -LiteralPath $Paquete -Recurse -File | Unblock-File
 
-    # WebView2 (el motor de la ventana de chat): viene con Windows 11 y con Edge; si falta, se instala.
-    $wv = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
-    if (-not (Get-ItemProperty $wv -Name pv -ErrorAction SilentlyContinue)) {
-        Write-Host 'Instalando WebView2...'
-        $wvexe = Join-Path $env:TEMP 'MicrosoftEdgeWebview2Setup.exe'
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $wvexe -UseBasicParsing
-        Start-Process $wvexe -ArgumentList '/silent', '/install' -Wait
-        Remove-Item $wvexe -Force
-    }
-
     # Carpeta de datos (configuración con el token, registro, temporales de los scripts): solo SYSTEM y Administradores.
     # ProgramData deja a cualquier usuario crear carpetas; si alguien la creó antes (no es de un administrador) o es un
     # enlace, se borra y se crea de nuevo, ya con sus permisos (sin herencia, en la misma llamada).
@@ -102,6 +91,30 @@ try {
     $seguridad.SetSecurityDescriptorSddlForm('D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)')
     if (Test-Path -LiteralPath $Datos) { Set-Acl -LiteralPath $Datos -AclObject $seguridad }
     else { [void][IO.Directory]::CreateDirectory($Datos, $seguridad) }
+    # otra vez: si alguien la creó entre el borrado y la creación, no es de un administrador y no se sigue
+    $item = Get-Item -LiteralPath $Datos -Force
+    $sid = (New-Object Security.Principal.NTAccount((Get-Acl -LiteralPath $Datos).Owner)).Translate([Security.Principal.SecurityIdentifier]).Value
+    if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or $sid -notin 'S-1-5-18', 'S-1-5-32-544') {
+        throw "$Datos no quedó en manos de un administrador; vuelve a ejecutar el instalador."
+    }
+
+    # WebView2 (el motor de la ventana de chat): viene con Windows 11 y con Edge; si falta, se instala.
+    $wv = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+    if (-not (Get-ItemProperty $wv -Name pv -ErrorAction SilentlyContinue)) {
+        Write-Host 'Instalando WebView2...'
+        # en la carpeta de Helpert (solo administradores), no en TEMP, y solo si lo firmó Microsoft
+        $wvexe = Join-Path $Datos ("webview2-" + [guid]::NewGuid().ToString('N') + '.exe')
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $wvexe -UseBasicParsing
+        $firma = Get-AuthenticodeSignature -LiteralPath $wvexe
+        if ($firma.Status -ne 'Valid' -or $firma.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') {
+            Remove-Item -LiteralPath $wvexe -Force
+            throw 'El instalador de WebView2 descargado no tiene la firma de Microsoft.'
+        }
+        Start-Process $wvexe -ArgumentList '/silent', '/install' -Wait
+        Remove-Item -LiteralPath $wvexe -Force
+    }
+
 
     # Token del equipo: el que ya tenía o uno nuevo con la clave de inscripción (va en el cuerpo, no en la línea de órdenes).
     if (-not $token) {
