@@ -74,6 +74,8 @@ def test_mi_dia_del_tecnico(servidor, falso):
     assert "Av. Alfa 100" in pagina and "Jr. Beta 200" not in pagina
     assert 'href="tel:+51999111222"' in pagina and "pc-1 (Windows)" in pagina and "la impresora no prende" in pagina
     assert 'title="Tus visitas por atender"' in pagina and "Cerrar la visita" in pagina
+    cola = pagina.split("Casos N2 que esperan")[1].split("</section>")[0]
+    assert f"Caso #{cid}" not in cola and "Ningún caso N2 espera" in cola  # ya es su visita: no se repite en la cola
 
 
 def test_resumen_de_mi_empresa(servidor, falso):

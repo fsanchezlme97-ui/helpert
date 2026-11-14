@@ -420,7 +420,7 @@ def montar(app: FastAPI, cfg: dict) -> None:
                     f'focus-visible:underline" href="/consola/caso/{k["id"]}">Caso #{k["id"]}</a>{insignia(*NIVEL[k["nivel"]])}'
                     f'<span class="text-sm">{e(k["categoria"] or "Sin clasificar")}'
                     + (f' <span class="text-muted-foreground">· {e(k["subcategoria"])}</span>' if k["subcategoria"] else "")
-                    + f'</span><span class="ml-auto flex flex-wrap gap-1.5">{plazo}{quien}{visita}</span></div>'
+                    + f'</span><span class="flex flex-wrap gap-1.5 sm:ml-auto">{plazo}{quien}{visita}</span></div>'
                     f'<p class="text-xs text-muted-foreground">{e(k["persona"])} · {e(k["equipo"])} ({e(sistema(k["so"]) or "—")})'
                     + (f' · {e(k["empresa"])}' if p["empresa_id"] is None else "")
                     + f' · escalado hace {duracion((ahora - (k["escalado"] or ahora)).total_seconds())}'
@@ -922,6 +922,8 @@ def montar(app: FastAPI, cfg: dict) -> None:
         # «Mi día» del técnico (N2 en sitio)
         abiertas = sorted((v for v in filas if v["estado"] == "asignada"), key=lambda v: (v["eta"] or ahora, v["id"]))
         hechas = [v for v in filas if v["estado"] in ("atendida", "cancelada")]
+        mias = {v["caso_id"] for v in abiertas}  # lo que ya es su visita no se repite en la cola
+        cola_n2 = [k for k in cola_n2 if k["id"] not in mias]
         hoy = datetime.now(zona())
         hoy_txt = (f'{("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")[hoy.weekday()]} {hoy.day} de '
                    f'{("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre")[hoy.month - 1]}')
