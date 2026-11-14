@@ -60,6 +60,12 @@ fn entrar(socket: &str) -> bool {
 
 fn main() {
     let socket = agente::canal::ruta();
+    if std::env::args().any(|a| a == "--estado") {
+        // diagnóstico (y prueba de la CI): ¿responden el servicio y el servidor? Sale con 1 si no.
+        let r = enviar(&socket, json!({"tipo": "cuenta", "accion": "estado"}));
+        println!("{r}");
+        std::process::exit(if r.get("error").is_some() { 1 } else { 0 });
+    }
     if !entrar(&socket) {
         return;
     }

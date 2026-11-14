@@ -31,7 +31,12 @@ jobs:
       - name: Agente
         run: cd agente; cargo test -q; cargo build --release -q
       - name: Bandeja
-        run: cd bandeja; cargo build --release -q
+        run: cd bandeja; cargo test -q; cargo build --release -q
+      - name: Scripts de los playbooks (PowerShell 5.1)
+        shell: powershell
+        run: .\playbooks\probar-windows.ps1
+      - name: Servicio, tubería y servidor de punta a punta
+        run: .\despliegue\probar-windows-ci.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: helpert-windows
