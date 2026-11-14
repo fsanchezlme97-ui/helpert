@@ -73,3 +73,13 @@
   .choices[data-type*="select-one"]::after { @apply dark:invert; }
   .choices__placeholder { @apply opacity-100 text-muted-foreground; }
 }
+
+/* Insignias en tema claro: texto un tono más oscuro para llegar a 4.5:1 sobre su fondo teñido (WCAG AA) */
+@media (prefers-color-scheme: light) {
+  @layer components {
+    .insignia-exito { color: color-mix(in oklab, var(--exito) 82%, black); }
+    .insignia-alerta { color: color-mix(in oklab, var(--alerta) 85%, black); }
+    .insignia-info { color: color-mix(in oklab, var(--info) 82%, black); }
+    .insignia-peligro { color: color-mix(in oklab, var(--peligro) 80%, black); }
+  }
+}

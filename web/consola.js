@@ -9,7 +9,10 @@
     info: "_START_–_END_ de _TOTAL_", infoEmpty: "Sin resultados", infoFiltered: "(filtrado de _MAX_)",
     zeroRecords: "Nada coincide con la búsqueda.", emptyTable: "No hay datos.",
     paginate: { first: "Primera", last: "Última", next: "›", previous: "‹" },
-    aria: { orderable: "Ordenar por esta columna", orderableReverse: "Invertir orden" },
+    aria: {
+      orderable: "Ordenar por esta columna", orderableReverse: "Invertir orden",
+      paginate: { first: "Primera", previous: "Anterior", next: "Siguiente", last: "Última" },
+    },
   };
   const guardar = (k, v) => { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch { /* sin almacenamiento */ } };
   const leer = (k) => { try { return JSON.parse(sessionStorage.getItem(k)); } catch { return null; } };
@@ -70,6 +73,11 @@
       noResultsText: "Sin resultados",
       noChoicesText: "No hay más opciones",
     });
+    // Choices arma su propio combobox: le pasa el nombre accesible del select (aria-label o su <label>)
+    const nombre = sel.getAttribute("aria-label") || sel.labels[0]?.textContent.trim();
+    if (nombre) {
+      for (const el of [ch.containerOuter?.element, ch.input?.element, ch.choiceList?.element, ch.itemList?.element]) el?.setAttribute("aria-label", nombre);
+    }
     sel.addEventListener("showDropdown", () => abiertos.add(ch));
     sel.addEventListener("hideDropdown", () => abiertos.delete(ch));
     if (filtro) {

@@ -229,12 +229,12 @@ def montar(app: FastAPI, cfg: dict) -> None:
         titulo = {403: "Sin acceso", 404: "No encontrado", 409: "El caso ya cambió", 422: "Revisa los datos",
                   429: "Demasiados intentos"}.get(estado, "Algo salió mal")
         cuerpo = (
-            '<div class="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted/50 p-6 md:p-10">'
+            '<main class="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted/50 p-6 md:p-10">'
             f'<div class="flex w-full max-w-md flex-col gap-6"><div class="flex justify-center">{logo("size-11", "Helpert")}</div>'
             '<div class="tarjeta" role="alert"><div class="tarjeta-cab text-center">'
             f'<p class="text-sm font-medium text-muted-foreground">Error {estado}</p><h1 class="text-xl font-semibold">{titulo}</h1>'
             f'<p class="tarjeta-desc">{e(mensaje)}</p></div><div class="tarjeta-cuerpo flex flex-wrap justify-center gap-2">'
-            f'<a class="btn btn-primario" href="/consola">{icono("atras")}Volver a la consola</a></div></div></div></div>')
+            f'<a class="btn btn-primario" href="/consola">{icono("atras")}Volver a la consola</a></div></div></div></main>')
         return pagina(titulo, cuerpo, estado=estado)
 
     # Errores de la consola como página (no JSON); la API de los agentes (/v1) y las redirecciones siguen igual.
@@ -339,7 +339,7 @@ def montar(app: FastAPI, cfg: dict) -> None:
             '<header class="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/85 px-4 backdrop-blur '
             'supports-[backdrop-filter]:bg-background/70 md:px-6">'
             f'<span class="md:hidden">{logo("size-7", "Helpert")}</span>'
-            '<nav class="flex min-w-0 flex-1 gap-0.5 overflow-x-auto [scrollbar-width:none] md:hidden" aria-label="Secciones">'
+            '<nav class="flex min-w-0 flex-1 gap-0.5 overflow-x-auto [scrollbar-width:none] md:hidden" aria-label="Menú">'
             + "".join(enlace(*x, movil=True) for x in enlaces + gestion) + '</nav>'
             '<div class="hidden items-center gap-2 text-sm md:flex"><span class="text-muted-foreground">Consola</span>'
             f'<span class="text-muted-foreground/60">/</span><span class="font-medium">{e(titulo)}</span></div>'
@@ -449,7 +449,7 @@ def montar(app: FastAPI, cfg: dict) -> None:
         aviso = (f'<div class="alerta alerta-peligro" role="alert">{icono("alerta")}<p>{e(mensaje)}</p></div>'
                  if mensaje else "")
         return (
-            '<div class="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted/50 p-6 md:p-10">'
+            '<main class="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted/50 p-6 md:p-10">'
             '<div class="flex w-full max-w-sm flex-col gap-6">'
             f'<div class="flex items-center gap-2.5 self-center">{logo("size-11")}'
             '<span class="text-lg font-semibold tracking-tight">Helpert</span></div>'
@@ -463,7 +463,7 @@ def montar(app: FastAPI, cfg: dict) -> None:
             '<input class="campo" id="clave" name="clave" type="password" autocomplete="current-password" required></div>'
             '<button class="btn btn-primario w-full">Entrar</button></form></div></div>'
             '<p class="text-balance text-center text-xs text-muted-foreground">Acceso para administración, analistas, técnicos y '
-            'gerencia.</p></div></div>')
+            'gerencia.</p></div></main>')
 
     @app.get("/consola/login", include_in_schema=False)
     def login_get():
@@ -540,7 +540,7 @@ def montar(app: FastAPI, cfg: dict) -> None:
             f'<div class="relative"><span class="pointer-events-none absolute left-2.5 top-2.5 text-muted-foreground">{icono("buscar")}</span>'
             '<input class="campo w-64 pl-8" type="search" data-buscar="tabla-casos" placeholder="Buscar caso, equipo, usuario…" '
             'aria-label="Buscar en los casos"></div>'
-            f'<select name="categoria" multiple data-choices data-filtro="tabla-casos:{6 if plataforma else 5}" data-placeholder="Categoría" '
+            f'<select name="categoria" multiple data-choices data-filtro="tabla-casos:{5 if plataforma else 4}" data-placeholder="Categoría" '
             'aria-label="Filtrar por categoría">'
             + "".join(f'<option value="{e(x)}">{e(x)}</option>' for x in (*aj()["categorias"], "Sin clasificar")) + '</select></div>')
         opcion = lambda v, txt, act: f'<option value="{v}"{" selected" if v == act else ""}>{e(txt)}</option>'
@@ -563,24 +563,26 @@ def montar(app: FastAPI, cfg: dict) -> None:
             categoria = f["categoria"] or "Sin clasificar"
             return (
                 f'<tr data-href="/consola/caso/{f["id"]}">'
-                f'<td data-order="{f["id"]}"><a class="font-medium underline-offset-4 hover:underline" href="/consola/caso/{f["id"]}">#{f["id"]}</a></td>'
-                f'<td data-order="{f["creado"].isoformat()}" class="whitespace-nowrap tabular-nums text-muted-foreground">{fecha(f["creado"])}</td>'
+                # la fecha de apertura va bajo el número (el orden por número es el de apertura): una columna menos
+                f'<td data-order="{f["id"]}"><a class="font-medium underline-offset-4 hover:underline" href="/consola/caso/{f["id"]}">#{f["id"]}</a>'
+                f'<span class="block whitespace-nowrap text-xs tabular-nums text-muted-foreground">{fecha(f["creado"])}</span></td>'
                 f'<td><span class="inline-flex items-center gap-1.5 whitespace-nowrap">{icono("equipo", "size-3.5 text-muted-foreground")}{e(f["equipo"])}</span>'
                 f'<span class="block pl-5 text-xs text-muted-foreground">{e(sistema(f["equipo_so"] or f["so"]))}</span></td>'
-                + (f'<td class="whitespace-nowrap text-muted-foreground">{e(f["empresa"])}</td>' if plataforma else "")
+                + (f'<td class="max-w-32 truncate text-muted-foreground" title="{e(f["empresa"])}">{e(f["empresa"])}</td>'
+                   if plataforma else "")
                 + f'<td class="max-w-40 truncate 2xl:max-w-60" title="{e(f["persona_email"] or f["usuario"])}">{e(f["persona_email"] or f["usuario"])}</td>'
-                f'<td data-search="{e(ESTADO_CASO.get(f["estado"], (f["estado"],))[0])}"><div class="flex flex-nowrap gap-1">'
+                f'<td data-search="{e(ESTADO_CASO.get(f["estado"], (f["estado"],))[0])}"><div class="flex max-w-40 flex-wrap gap-1">'
                 f'{estado_caso(f["estado"], f["resuelto"])}{insignia(*NIVEL[f["nivel"]]) if f["nivel"] > 1 else ""}</div></td>'
-                f'<td data-search="{e(categoria)}"><div class="max-w-48 truncate 2xl:max-w-80" title="{e(categoria)}'
+                f'<td data-search="{e(categoria)}"><div class="max-w-40 truncate 2xl:max-w-80" title="{e(categoria)}'
                 + (f' · {e(f["subcategoria"])}' if f["subcategoria"] else "") + f'"><span class="font-medium">{e(categoria)}</span>'
                 + (f' <span class="text-muted-foreground">· {e(f["subcategoria"])}</span>' if f["subcategoria"] else "") + '</div></td>'
-                f'<td>{f"<span class=\"codigo\">{e(f["playbook"])}</span>" if f["playbook"] else "<span class=\"text-muted-foreground\">—</span>"}</td>'
+                f'<td>{f"<span class=\"codigo inline-block max-w-36 truncate align-middle\" title=\"{e(f["playbook"])}\">{e(f["playbook"])}</span>" if f["playbook"] else "<span class=\"text-muted-foreground\">—</span>"}</td>'
                 f'<td class="hidden whitespace-nowrap text-xs text-muted-foreground 2xl:table-cell">{e(f["modelo"])}</td>'
                 f'<td data-order="{f["calificacion"] or 0}">{nota}</td></tr>')
 
         # «Modelo» solo en pantallas muy anchas: a 1440 px la tabla entra sin desplazarse (el modelo está en el caso y en Métricas)
         cab = "".join('<th class="hidden 2xl:table-cell">Modelo</th>' if t == "Modelo" else f"<th>{t}</th>"
-                      for t in ("Caso", "Abierto", "Equipo", *(("Empresa",) if plataforma else ()), "Persona",
+                      for t in ("Caso", "Equipo", *(("Empresa",) if plataforma else ()), "Persona",
                                 "Estado", "Categoría", "Playbook", "Modelo", "Nota"))
         if filas:
             tabla = (f'<div class="tabla-caja"><table id="tabla-casos" class="tabla" data-tabla="completa">'
@@ -1788,7 +1790,7 @@ def montar(app: FastAPI, cfg: dict) -> None:
                 SELECT modelo, count(*) AS casos, count(*) FILTER (WHERE nota IS NOT NULL) AS incidencias, max(creado) AS ultimo
                 FROM casos WHERE creado > now() - interval '24 hours' AND modelo IS NOT NULL GROUP BY 1""")}
             bajos = [f for f in fondos(c, "e.fondo_activo AND e.activa") if float(f["saldo"]) < float(f["alerta_usd"])]
-        tabla_agentes = ('<div class="tabla-caja"><table class="tabla"><thead><tr><th>Sistema</th><th>Versión del agente</th>'
+        tabla_agentes = ('<div class="tabla-caja" tabindex="0" role="region" aria-label="Agentes por sistema y versión"><table class="tabla"><thead><tr><th>Sistema</th><th>Versión del agente</th>'
                          '<th class="text-right">Equipos</th><th class="text-right">En línea</th><th class="text-right">Sin señal</th>'
                          '</tr></thead><tbody>' + "".join(
                              f'<tr><td class="font-medium">{e(sistema(f["so"]) or "Sin informar")}</td>'
