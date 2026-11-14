@@ -23,7 +23,7 @@ def test_flujo_completo(servidor, falso):
     assert r["trabajo"]["paso"] == "diagnosticar" and r["trabajo"]["parametros"] == {"nombre": "x1"}
     r = resultado(cli, r["trabajo"])
     assert r["confirmar"] and r["estado"] == "esperando_confirmacion"
-    r = cli.post("/v1/confirmar", json={"caso_id": r["caso_id"], "acepta": True}).json()
+    r = cli.post("/v1/confirmar", json={"usuario": "ana", "caso_id": r["caso_id"], "acepta": True}).json()
     assert r["trabajo"]["paso"] == "comprobar"
     r = resultado(cli, r["trabajo"])
     assert r["trabajo"]["paso"] == "aplicar"
@@ -31,7 +31,7 @@ def test_flujo_completo(servidor, falso):
     assert r["trabajo"]["paso"] == "verificar"
     r = resultado(cli, r["trabajo"])
     assert r["cierre"] and r["estado"] == "esperando_cierre"
-    r = cli.post("/v1/cierre", json={"caso_id": r["caso_id"], "resuelto": True, "calificacion": 5}).json()
+    r = cli.post("/v1/cierre", json={"usuario": "ana", "caso_id": r["caso_id"], "resuelto": True, "calificacion": 5}).json()
     assert r["estado"] == "cerrado" and r["fin"]
 
 
@@ -40,7 +40,7 @@ def test_no_aplica_sin_confirmacion_registrada(servidor, falso):
     falso["a"].append(ELIGE_DEMO)
     r = enviar(cli)
     r = resultado(cli, r["trabajo"])
-    r = cli.post("/v1/confirmar", json={"caso_id": r["caso_id"], "acepta": True}).json()
+    r = cli.post("/v1/confirmar", json={"usuario": "ana", "caso_id": r["caso_id"], "acepta": True}).json()
     with db.conexion(cli.ruta_db) as c:
         c.execute("DELETE FROM confirmaciones")
     res = cli.post("/v1/resultado", json={"trabajo_id": r["trabajo"]["id"], "codigo": 0})
@@ -51,7 +51,7 @@ def test_rechazar_no_ejecuta_nada(servidor, falso):
     cli = servidor()
     falso["a"].append(ELIGE_DEMO)
     r = resultado(cli, enviar(cli)["trabajo"])
-    r = cli.post("/v1/confirmar", json={"caso_id": r["caso_id"], "acepta": False}).json()
+    r = cli.post("/v1/confirmar", json={"usuario": "ana", "caso_id": r["caso_id"], "acepta": False}).json()
     assert "trabajo" not in r and r["estado"] == "conversando"
 
 
@@ -68,7 +68,7 @@ def test_otro_equipo_no_ve_el_caso(servidor, falso):
     falso["a"].append(ELIGE_DEMO)
     r = resultado(cli, enviar(cli)["trabajo"])
     otro = db.equipo_nuevo(cli.ruta_db, "pc-2")
-    res = cli.post("/v1/confirmar", json={"caso_id": r["caso_id"], "acepta": True},
+    res = cli.post("/v1/confirmar", json={"usuario": "ana", "caso_id": r["caso_id"], "acepta": True},
                    headers={"Authorization": f"Bearer {otro}"})
     assert res.status_code == 404
 
@@ -210,13 +210,13 @@ def test_confirmar_espera_el_bloqueo_del_caso(servidor, falso):
     with db.conexion(cli.ruta_db) as c:
         c.execute("SELECT 1 FROM casos WHERE id = %s FOR UPDATE", (r["caso_id"],))
         h = threading.Thread(target=lambda: respuestas.append(
-            cli.post("/v1/confirmar", json={"caso_id": r["caso_id"], "acepta": True})))
+            cli.post("/v1/confirmar", json={"usuario": "ana", "caso_id": r["caso_id"], "acepta": True})))
         h.start()
         h.join(0.7)
         assert h.is_alive(), "confirmar no esperó el bloqueo del caso"
     h.join(10)
     assert respuestas[0].status_code == 200
-    segunda = cli.post("/v1/confirmar", json={"caso_id": r["caso_id"], "acepta": True})
+    segunda = cli.post("/v1/confirmar", json={"usuario": "ana", "caso_id": r["caso_id"], "acepta": True})
     assert segunda.status_code == 409  # el paso ya se emitió una vez
 
 
@@ -280,7 +280,19 @@ def test_duda_de_uso_se_responde_con_guia(servidor, falso):
     falso["a"].append(contrato(tipo="Solicitud", categoria="Hardware", respuesta=guia))
     r = enviar(cli, "¿cómo guardo una página en marcadores?")
     assert r["respuesta"] == guia and r["cierre"] and r["estado"] == "esperando_cierre"
-    r = cli.post("/v1/cierre", json={"caso_id": r["caso_id"], "resuelto": False, "calificacion": 2}).json()
+    r = cli.post("/v1/cierre", json={"usuario": "ana", "caso_id": r["caso_id"], "resuelto": False, "calificacion": 2}).json()
     assert r["estado"] == "escalado" and "técnico pase" not in r["respuesta"]  # una duda de uso no abre visita
     falso["a"].append(contrato(respuesta="¿Usas Chrome o Firefox?"))  # una pregunta en «respuesta» no cierra
     assert enviar(cli, "otra duda")["estado"] == "conversando"
+
+
+def test_otro_usuario_del_equipo_no_toca_el_caso(servidor, falso):
+    """Equipo compartido: «beto» (otro usuario del sistema) no confirma, cierra ni ve los avisos del caso de «ana»."""
+    cli = servidor()
+    falso["a"].append(ELIGE_DEMO)
+    r = enviar(cli)
+    otro = {"caso_id": r["caso_id"], "usuario": "beto"}
+    assert cli.post("/v1/confirmar", json={**otro, "acepta": True}).status_code == 404
+    assert cli.post("/v1/cierre", json={**otro, "resuelto": True, "calificacion": 5}).status_code == 404
+    assert cli.post("/v1/captura", json={**otro, "acepta": False}).status_code == 404
+    assert cli.post("/v1/confirmar", json={**otro, "usuario": "ana", "acepta": True}).status_code == 409  # el suyo sí lo encuentra

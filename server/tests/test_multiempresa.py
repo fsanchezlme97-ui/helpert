@@ -117,7 +117,7 @@ def test_n2_pasa_a_n3_y_resuelve(servidor, falso):
     web.post(f"/consola/caso/{cid}/resolver", data={"solucion": "Reinstalé el controlador", "csrf": t})
     aviso = api.post("/v1/latido", json={}).json()["avisos"][0]
     assert aviso["cierre"] and "Reinstalé el controlador" in aviso["texto"]
-    r = api.post("/v1/cierre", json={"caso_id": cid, "resuelto": True, "calificacion": 5}).json()
+    r = api.post("/v1/cierre", json={"usuario": "ana", "caso_id": cid, "resuelto": True, "calificacion": 5}).json()
     assert r["estado"] == "cerrado"
 
 

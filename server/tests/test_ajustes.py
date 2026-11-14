@@ -45,7 +45,7 @@ def test_playbook_desactivado_corta_casos_en_curso(servidor, falso):
     r = resultado(api, r["trabajo"])  # diagnóstico: hay algo que corregir → pide confirmación
     assert r.get("confirmar")
     web.post("/consola/admin/playbooks/demo.archivo/desactivar", data={"csrf": csrf_de(web, "/consola/admin/playbooks")})
-    r = api.post("/v1/confirmar", json={"caso_id": r["caso_id"], "acepta": True}).json()
+    r = api.post("/v1/confirmar", json={"usuario": "ana", "caso_id": r["caso_id"], "acepta": True}).json()
     assert r["estado"] == "escalado" and "trabajo" not in r
     falso["a"].append(ELIGE_DEMO)  # y la IA ya no puede elegirlo
     assert enviar(api)["estado"] == "escalado"

@@ -43,21 +43,25 @@ class Inscripcion(BaseModel):
 
 class Confirmar(BaseModel):
     caso_id: int
+    usuario: str = Field(max_length=64)  # usuario del sistema que pide (lo pone el agente): un caso ajeno no se toca
     acepta: bool
 
 
 class Captura(BaseModel):
     caso_id: int
+    usuario: str = Field(max_length=64)  # usuario del sistema que pide (lo pone el agente): un caso ajeno no se toca
     acepta: bool
     imagen: str | None = Field(default=None, max_length=12_000_000)  # base64 de un PNG o JPEG (≈ 8 MB)
 
 
 class Visto(BaseModel):
     id: int
+    usuario: str = Field(max_length=64)  # usuario del sistema que pide (lo pone el agente): un caso ajeno no se toca
 
 
 class Cierre(BaseModel):
     caso_id: int
+    usuario: str = Field(max_length=64)  # usuario del sistema que pide (lo pone el agente): un caso ajeno no se toca
     resuelto: bool
     calificacion: int = Field(ge=1, le=5)  # obligatoria
     comentario: str | None = Field(default=None, max_length=500)
@@ -192,8 +196,9 @@ def crear_app(cfg: dict) -> FastAPI:
             aj = ajustes.leer(c, cfg)
             if time.monotonic() - purga["ultima"] > 3600:
                 purgar(c, aj)
-            avisos = c.execute("SELECT id, caso_id, texto, cierre FROM avisos WHERE equipo_id = %s AND visto IS NULL "
-                               "ORDER BY id LIMIT 10", (eq["id"],)).fetchall()
+            # usuario: el agente solo entrega a cada usuario del sistema los avisos de sus casos
+            avisos = c.execute("SELECT a.id, a.caso_id, a.texto, a.cierre, k.usuario FROM avisos a JOIN casos k ON k.id = a.caso_id "
+                               "WHERE a.equipo_id = %s AND a.visto IS NULL ORDER BY a.id LIMIT 10", (eq["id"],)).fetchall()
             r = {"ok": True, "avisos": avisos}
             if (act := actualizacion(c, eq, aj)):
                 r["actualizar"] = act
@@ -202,7 +207,8 @@ def crear_app(cfg: dict) -> FastAPI:
     @app.post("/v1/avisos/visto")
     def aviso_visto(v: Visto, eq=Depends(equipo)):
         with db.conexion(ruta) as c:
-            c.execute("UPDATE avisos SET visto = now() WHERE id = %s AND equipo_id = %s AND visto IS NULL", (v.id, eq["id"]))
+            c.execute("UPDATE avisos a SET visto = now() FROM casos k WHERE a.id = %s AND a.equipo_id = %s AND a.visto IS NULL "
+                      "AND k.id = a.caso_id AND k.usuario = %s", (v.id, eq["id"], v.usuario))
         return {"ok": True}
 
     @app.get("/v1/actualizacion/{sha}")
@@ -239,9 +245,11 @@ def crear_app(cfg: dict) -> FastAPI:
             return gasto < emp["tope_persona_usd"]
         return True
 
-    def caso_de(c, equipo_id, caso_id):
-        # FOR UPDATE: dos peticiones a la vez sobre el mismo caso esperan su turno (no se emite dos veces un paso)
-        caso = c.execute("SELECT * FROM casos WHERE id = %s AND equipo_id = %s FOR UPDATE", (caso_id, equipo_id)).fetchone()
+    def caso_de(c, equipo_id, caso_id, usuario):
+        # FOR UPDATE: dos peticiones a la vez sobre el mismo caso esperan su turno (no se emite dos veces un paso).
+        # usuario: en un equipo compartido, nadie confirma, cierra ni manda capturas a un caso de otro usuario.
+        caso = c.execute("SELECT * FROM casos WHERE id = %s AND equipo_id = %s AND usuario = %s FOR UPDATE",
+                         (caso_id, equipo_id, usuario)).fetchone()
         if not caso:
             raise HTTPException(404, "Caso no encontrado")
         return caso
@@ -327,7 +335,7 @@ def crear_app(cfg: dict) -> FastAPI:
                                  "VALUES (%s, %s, %s, 'conversando', %s, %s) RETURNING *",
                                  (eq["id"], m.usuario, m.so, emp, per["id"])).fetchone()
             else:
-                caso = caso_de(c, eq["id"], m.caso_id)
+                caso = caso_de(c, eq["id"], m.caso_id, m.usuario)
                 if caso["persona_id"] not in (None, per["id"]):
                     raise HTTPException(404, "Caso no encontrado")
                 if caso["estado"] not in ("conversando", "menu"):
@@ -399,7 +407,7 @@ def crear_app(cfg: dict) -> FastAPI:
     def captura(k: Captura, eq=Depends(equipo)):
         """Captura de pantalla con permiso. acepta=false también se registra (plan: «se registra la respuesta»)."""
         with db.conexion(ruta) as c:
-            caso = caso_de(c, eq["id"], k.caso_id)
+            caso = caso_de(c, eq["id"], k.caso_id, k.usuario)
             aj = ajustes.leer(c, cfg, caso["empresa_id"])
             externa = aj["capturas"]["ia_externa"] and ia_externa(c, caso["empresa_id"], caso["persona_id"])
             if caso["estado"] == "cerrado" or caso["creado"] < db.ahora() - timedelta(days=1):
@@ -467,7 +475,7 @@ def crear_app(cfg: dict) -> FastAPI:
     @app.post("/v1/confirmar")
     def confirmar(r: Confirmar, eq=Depends(equipo)):
         with db.conexion(ruta) as c:
-            caso = caso_de(c, eq["id"], r.caso_id)
+            caso = caso_de(c, eq["id"], r.caso_id, r.usuario)
             if caso["estado"] != "esperando_confirmacion":
                 raise HTTPException(409, "No hay nada pendiente de confirmar")
             if not r.acepta:
@@ -481,7 +489,7 @@ def crear_app(cfg: dict) -> FastAPI:
     @app.post("/v1/cierre")
     def cierre(r: Cierre, eq=Depends(equipo)):
         with db.conexion(ruta) as c:
-            caso = caso_de(c, eq["id"], r.caso_id)
+            caso = caso_de(c, eq["id"], r.caso_id, r.usuario)
             if caso["estado"] != "esperando_cierre":
                 raise HTTPException(409, "El caso no está esperando cierre")
             actualizar(c, caso["id"], resuelto=r.resuelto, calificacion=r.calificacion, comentario=r.comentario)

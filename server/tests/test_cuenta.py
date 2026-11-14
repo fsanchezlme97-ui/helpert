@@ -81,8 +81,8 @@ def test_calificacion_obligatoria_y_cierre_automatico(servidor, falso):
     assert r["cierre"]
     r = enviar(api, "otro problema")  # no abre un caso nuevo: primero se califica el anterior
     assert r["caso_id"] == cid and r["cierre"] and r["pendiente"]
-    assert api.post("/v1/cierre", json={"caso_id": cid, "resuelto": True}).status_code == 422  # sin nota no se cierra
-    assert api.post("/v1/cierre", json={"caso_id": cid, "resuelto": True, "calificacion": 4}).json()["estado"] == "cerrado"
+    assert api.post("/v1/cierre", json={"usuario": "ana", "caso_id": cid, "resuelto": True}).status_code == 422  # sin nota no se cierra
+    assert api.post("/v1/cierre", json={"usuario": "ana", "caso_id": cid, "resuelto": True, "calificacion": 4}).json()["estado"] == "cerrado"
     historial = api.post("/v1/cuenta/casos", json={"usuario": "ana"}).json()["casos"]
     assert historial[0]["id"] == cid and historial[0]["titulo"] == "no funciona el archivo x1" and historial[0]["calificacion"] == 4
 

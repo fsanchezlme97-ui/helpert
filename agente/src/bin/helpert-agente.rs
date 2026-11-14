@@ -213,14 +213,14 @@ impl Agente {
     fn atender(&self, pet: &Value, usuario: &str, trabajando: &mut dyn FnMut()) -> Value {
         let (ruta, cuerpo) = match pet["tipo"].as_str() {
             Some("mensaje") => ("/v1/mensaje", json!({"caso_id": pet["caso_id"], "texto": pet["texto"], "usuario": usuario, "so": SO})),
-            Some("confirmar") => ("/v1/confirmar", json!({"caso_id": pet["caso_id"], "acepta": pet["acepta"]})),
-            Some("cierre") => ("/v1/cierre", json!({"caso_id": pet["caso_id"], "resuelto": pet["resuelto"],
+            Some("confirmar") => ("/v1/confirmar", json!({"caso_id": pet["caso_id"], "acepta": pet["acepta"], "usuario": usuario})),
+            Some("cierre") => ("/v1/cierre", json!({"caso_id": pet["caso_id"], "resuelto": pet["resuelto"], "usuario": usuario,
                                                     "calificacion": pet["calificacion"], "comentario": pet["comentario"]})),
             Some("captura") => {
                 if pet["imagen"].as_str().map_or(0, str::len) > 12_000_000 {
                     return json!({"error": "La captura es demasiado grande"});
                 }
-                ("/v1/captura", json!({"caso_id": pet["caso_id"], "acepta": pet["acepta"], "imagen": pet["imagen"]}))
+                ("/v1/captura", json!({"caso_id": pet["caso_id"], "acepta": pet["acepta"], "imagen": pet["imagen"], "usuario": usuario}))
             }
             Some("avisos") => {
                 // la bandeja pregunta cada 30 s; con ella abierta, el latido se adelanta para que el aviso llegue en ~1 min
@@ -228,7 +228,9 @@ impl Agente {
                 if viejo {
                     self.latir(false);
                 }
-                return json!({"avisos": *self.avisos.lock().unwrap()});
+                // cada usuario del sistema ve solo los avisos de sus casos (equipos compartidos)
+                let mios: Vec<Value> = self.avisos.lock().unwrap().iter().filter(|a| a["usuario"] == usuario).cloned().collect();
+                return json!({"avisos": mios});
             }
             Some("cuenta") => {
                 // inicio de sesión, perfil e historial de la persona; quién es lo dice el núcleo (usuario), no el cliente
@@ -246,8 +248,8 @@ impl Agente {
             }
             Some("aviso_visto") => {
                 let id = pet["id"].clone();
-                self.avisos.lock().unwrap().retain(|a| a["id"] != id);
-                return self.post("/v1/avisos/visto", &json!({"id": id})).unwrap_or_else(|e| json!({"error": e}));
+                self.avisos.lock().unwrap().retain(|a| a["id"] != id || a["usuario"] != usuario);
+                return self.post("/v1/avisos/visto", &json!({"id": id, "usuario": usuario})).unwrap_or_else(|e| json!({"error": e}));
             }
             _ => return json!({"error": "Petición no válida"}),
         };

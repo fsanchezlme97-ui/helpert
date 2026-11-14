@@ -92,10 +92,10 @@ def test_metricas_con_un_caso_resuelto(servidor, falso):
     api, web = consola(servidor)
     falso["a"].append(contrato(playbook={"id": "demo.archivo", "parametros": {"nombre": "x1"}}))
     r = resultado(api, enviar(api)["trabajo"])
-    r = api.post("/v1/confirmar", json={"caso_id": r["caso_id"], "acepta": True}).json()
+    r = api.post("/v1/confirmar", json={"usuario": "ana", "caso_id": r["caso_id"], "acepta": True}).json()
     for _ in range(3):
         r = resultado(api, r["trabajo"])
-    api.post("/v1/cierre", json={"caso_id": r["caso_id"], "resuelto": True, "calificacion": 5})
+    api.post("/v1/cierre", json={"usuario": "ana", "caso_id": r["caso_id"], "resuelto": True, "calificacion": 5})
     entrar(web)
     m = web.get("/consola/metricas").text
     assert "100.0%" in m and "5.0 / 5" in m and "demo.archivo" in m
