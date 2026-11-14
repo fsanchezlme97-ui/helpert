@@ -28,7 +28,7 @@ diagnosticar)
   todas=$(lpstat -e 2>/dev/null)
   [ -n "$todas" ] || { echo "Este equipo no tiene impresoras instaladas; si necesitas una, soporte tiene que instalarla."; exit 10; }
   n=$(echo "$todas" | grep -c .); d=$(predeterminada)
-  if [ -n "$d" ]; then echo "Hay $n impresora(s) instalada(s); la predeterminada es «$d»."
+  if [ -n "$d" ]; then echo "Hay $n impresora(s) instalada(s); la predeterminada es «${d}»."
   else echo "Hay $n impresora(s) instalada(s) y ninguna es la predeterminada."; fi
   echo "$todas" | head -8 | while read -r p; do
     marca=""; [ "$p" = "$d" ] && marca=" (predeterminada)"

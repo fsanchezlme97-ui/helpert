@@ -32,7 +32,7 @@ diagnosticar)
   puedo || exit 3
   a=$(abiertos)
   if [ -z "$a" ]; then
-    echo "Ningún programa tuyo tiene abierto un archivo con «$archivo» en el nombre."
+    echo "Ningún programa tuyo tiene abierto un archivo con «${archivo}» en el nombre."
     echo "Si el aviso sigue, cierra sesión y vuelve a entrar. Si el archivo está en una memoria USB o una carpeta de red, puede tenerlo abierto otro equipo."
     exit 10
   fi

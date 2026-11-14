@@ -56,6 +56,14 @@ def test_scripts_de_los_playbooks():
             assert r.returncode == 2, (pb.id, so)
 
 
+def test_macos_sin_variables_pegadas_a_tildes():
+    # la bash 3.2 de macOS toma «, ñ, … pegados a $nombre como parte del nombre (con set -u, «unbound variable»)
+    import re
+    for f in (RAIZ / "playbooks").glob("*/macos.sh"):
+        for n, linea in enumerate(f.read_text().splitlines(), 1):
+            assert not re.search(r"\$[A-Za-z_]\w*[^\x00-\x7f]", linea, re.ASCII), f"{f.parent.name}/macos.sh:{n}: usa ${{nombre}}"
+
+
 @pytest.mark.parametrize("valor", ["HP; rm -rf /", "$(reboot)", "a b", "x" * 101, "`id`"])
 def test_rechaza_parametros_peligrosos(valor):
     pb = cat.cargar(RAIZ / "playbooks")["print.clear-queue"]

@@ -13,7 +13,7 @@ diagnosticar)
         n=$(dscacheutil -q group -a gid "$g" 2>/dev/null | awk -F': ' '$1 == "name" {print $2; exit}'); echo "${n:-grupo $g}"
       done | grep -v '^_' | grep -v '^com\.apple\.' | sort -u)
   n=$(printf '%s\n' "$l" | grep -c .)
-  echo "La cuenta «$usuario» pertenece a $n grupo(s), sin contar los internos de macOS:"
+  echo "La cuenta «${usuario}» pertenece a $n grupo(s), sin contar los internos de macOS:"
   printf '%s\n' "$l" | paste -sd, - | sed 's/,/, /g'
   echo "Si te acaban de agregar a un grupo, cierra sesión y vuelve a entrar para que cuente. Dar accesos lo hace soporte."
   exit 10 ;;

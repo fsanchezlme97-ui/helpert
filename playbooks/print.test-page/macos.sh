@@ -32,17 +32,17 @@ motivo() {
   activo || { echo "El servicio de impresión no responde: reinicia el Mac o avisa a soporte."; return; }
   [ -n "$(impresoras)" ] || { echo "Este equipo no tiene impresoras instaladas; soporte tiene que instalarla."; return; }
   p=$(destino)
-  if [ -z "$p" ] && [ -n "$pedida" ]; then echo "No encontré la impresora «$pedida». Las instaladas son: $(impresoras | head -8 | paste -sd, - | sed 's/,/, /g')."; return; fi
+  if [ -z "$p" ] && [ -n "$pedida" ]; then echo "No encontré la impresora «${pedida}». Las instaladas son: $(impresoras | head -8 | paste -sd, - | sed 's/,/, /g')."; return; fi
   [ -n "$p" ] || { echo "No hay una impresora predeterminada: dime a qué impresora envío la prueba."; return; }
-  virtual "$p" && { echo "«$p» no es una impresora de papel (guarda en un archivo): dime una impresora de verdad."; return; }
-  pausada "$p" && echo "La impresora «$p» está en pausa: reactívala en Ajustes del Sistema > Impresoras y escáneres (abre su cola y pulsa «Reanudar»)."
+  virtual "$p" && { echo "«${p}» no es una impresora de papel (guarda en un archivo): dime una impresora de verdad."; return; }
+  pausada "$p" && echo "La impresora «${p}» está en pausa: reactívala en Ajustes del Sistema > Impresoras y escáneres (abre su cola y pulsa «Reanudar»)."
 }
 
 case ${1:-} in
 diagnosticar)
   m=$(motivo); [ -z "$m" ] || { echo "$m"; exit 1; }
   p=$(destino); n=$(pendientes "$p")
-  echo "Voy a enviar una página de prueba a «$p»."
+  echo "Voy a enviar una página de prueba a «${p}»."
   [ "${n:-0}" -gt 0 ] && echo "Tiene $n trabajo(s) esperando en la cola: la prueba saldrá después de ellos."
   exit 0 ;;
 comprobar)
@@ -60,16 +60,16 @@ aplicar)
   fi
   lp -d "$p" -t "Página de prueba de Helpert" "$hoja" >/dev/null 2>&1; r=$?
   [ -z "$tmp" ] || rm -f "$tmp"
-  [ "$r" -eq 0 ] || { echo "No pude enviar la página de prueba a «$p»."; exit 1; }
-  echo "Envié una página de prueba a «$p»."
+  [ "$r" -eq 0 ] || { echo "No pude enviar la página de prueba a «${p}»."; exit 1; }
+  echo "Envié una página de prueba a «${p}»."
   exit 0 ;;
 verificar)
   p=$(destino)
   [ -n "$p" ] || { echo "No sé a qué impresora envié la prueba."; exit 1; }
   i=0; while [ "$i" -lt 20 ] && [ "$(pendientes "$p")" -gt 0 ]; do sleep 1; i=$((i + 1)); done
-  pausada "$p" && { echo "La impresora «$p» dio un error y quedó en pausa: revisa que esté encendida y conectada, y reactívala en Ajustes del Sistema > Impresoras y escáneres."; exit 1; }
-  [ "$(pendientes "$p")" -eq 0 ] || { echo "La página sigue en la cola de «$p» sin imprimirse: la impresora no responde. Revisa que esté encendida, con papel y conectada."; exit 1; }
-  echo "La página de prueba ya pasó a «$p»."
+  pausada "$p" && { echo "La impresora «${p}» dio un error y quedó en pausa: revisa que esté encendida y conectada, y reactívala en Ajustes del Sistema > Impresoras y escáneres."; exit 1; }
+  [ "$(pendientes "$p")" -eq 0 ] || { echo "La página sigue en la cola de «${p}» sin imprimirse: la impresora no responde. Revisa que esté encendida, con papel y conectada."; exit 1; }
+  echo "La página de prueba ya pasó a «${p}»."
   echo "Si no salió el papel, revisa que esté encendida, con papel y sin luces de error; si sigue igual, avisa a soporte."
   exit 0 ;;
 *) echo "Paso no válido"; exit 2 ;;

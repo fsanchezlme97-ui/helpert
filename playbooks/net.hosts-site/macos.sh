@@ -9,9 +9,9 @@ sitio=$(printf '%s' "${HP_SITIO:-}" | tr 'A-Z' 'a-z' | sed 's/^\.*//; s/\.*$//; 
 valido() {
   case $sitio in
   ''|-*|*..*) echo "Necesito la dirección del sitio, por ejemplo intranet.empresa.pe."; return 1 ;;
-  localhost|localhost.*|localdomain|ip6-*|broadcasthost) echo "«$sitio» es el propio equipo: esas líneas no se tocan."; return 1 ;;
+  localhost|localhost.*|localdomain|ip6-*|broadcasthost) echo "«${sitio}» es el propio equipo: esas líneas no se tocan."; return 1 ;;
   esac
-  [ "$sitio" = "$(uname -n | tr 'A-Z' 'a-z')" ] && { echo "«$sitio» es el nombre de este equipo: esas líneas no se tocan."; return 1; }
+  [ "$sitio" = "$(uname -n | tr 'A-Z' 'a-z')" ] && { echo "«${sitio}» es el nombre de este equipo: esas líneas no se tocan."; return 1; }
   return 0
 }
 # ver: las líneas que nombran el sitio; quitar: el archivo sin el sitio (una línea sin nombres se borra)

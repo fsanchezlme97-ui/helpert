@@ -34,7 +34,7 @@ diagnosticar)
   { command -v lpstat >/dev/null && command -v lpoptions >/dev/null; } || { echo "Este equipo no tiene el sistema de impresión (CUPS) instalado."; exit 1; }
   ps=$(impresoras)
   if [ -z "$ps" ]; then
-    [ -n "$pedida" ] && { echo "No encontré la impresora «$pedida» en este equipo."; exit 1; }
+    [ -n "$pedida" ] && { echo "No encontré la impresora «${pedida}» en este equipo."; exit 1; }
     echo "Este equipo no tiene impresoras instaladas."; exit 10
   fi
   lineas="" bajas="" informan=0
@@ -43,7 +43,7 @@ diagnosticar)
     if [ -z "$nv" ]; then lineas="$lineas- $p: no informa sus niveles."$'\n'; continue; fi
     informan=1; r=$(texto "$nv")
     lineas="$lineas- $p: ${r#*|}."$'\n'
-    [ "${r%%|*}" = 1 ] && bajas="${bajas:+$bajas, }«$p»"
+    [ "${r%%|*}" = 1 ] && bajas="${bajas:+$bajas, }«${p}»"
   done <<< "$ps"
   if [ "$informan" = 0 ]; then
     echo "La impresora no le informa a este equipo cuánto tóner o tinta le queda. Míralo en la pantalla de la impresora o pide a soporte que lo revise."

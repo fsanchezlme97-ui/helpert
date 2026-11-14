@@ -24,14 +24,14 @@ elegir() {
   d=$(dispositivo); s=
   [ -n "$d" ] && s=$(servicio "$d")
   [ -n "$s" ] || { echo "No hay ninguna conexión de red activa: conecta primero el cable o el Wi-Fi."; return 1; }
-  dhcp "$s" || { echo "Este equipo usa una IP fija en «$s»: renovarla no sirve. Si hay un problema con esa dirección, lo revisa soporte."; return 1; }
+  dhcp "$s" || { echo "Este equipo usa una IP fija en «${s}»: renovarla no sirve. Si hay un problema con esa dirección, lo revisa soporte."; return 1; }
 }
 
 case ${1:-} in
 diagnosticar)
   elegir || exit 3
   a=$(ipv4 "$d"); g=$(ipconfig getoption "$d" router 2>/dev/null)
-  if [ -z "$a" ]; then echo "Tu equipo no tiene dirección IP en «$s»: puedo pedirle una nueva al router."; echo "La red se corta unos segundos mientras tanto."; exit 0; fi
+  if [ -z "$a" ]; then echo "Tu equipo no tiene dirección IP en «${s}»: puedo pedirle una nueva al router."; echo "La red se corta unos segundos mientras tanto."; exit 0; fi
   if ! valida "$a"; then
     echo "Tu dirección IP es $a: el router no le dio una dirección al equipo. Puedo pedirle una nueva."
     echo "La red se corta unos segundos mientras tanto."
