@@ -26,7 +26,7 @@ class Mensaje(BaseModel):
     caso_id: int | None = None
     texto: str = Field(min_length=1, max_length=2000)
     usuario: str = Field(max_length=64)
-    so: Literal["linux", "windows"]
+    so: Literal["linux", "windows", "macos"]
 
 
 class Resultado(BaseModel):

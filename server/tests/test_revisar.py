@@ -38,6 +38,14 @@ def test_revisar_marca_lo_que_falta_y_lo_que_esta_bien(dsn, tmp_path, monkeypatc
     assert "falta" not in {v for k, v in e.items() if not k.startswith("Inscripción")}
 
 
+def test_revisar_avisa_si_ollama_no_alcanza_para_el_catalogo(dsn):
+    cfg = {"base_datos": dsn, "playbooks": str(RAIZ / "playbooks"),
+           "ia": [{"proveedor": "ollama", "modelo": "m", "contexto": 4096}]}
+    assert any(e == "falta" and "Ollama m tiene contexto 4096" in t for e, t in revisar(cfg))
+    cfg["ia"][0]["contexto"] = 16384
+    assert not any("Ollama" in t for _, t in revisar(cfg))
+
+
 def test_revisar_sin_base(tmp_path):
     lista = revisar({"base_datos": "postgresql://nadie@/no_existe?host=/no/existe", "playbooks": str(tmp_path)})
     assert lista[0][0] == "falta" and len(lista) == 1

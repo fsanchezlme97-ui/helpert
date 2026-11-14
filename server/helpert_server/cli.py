@@ -73,6 +73,15 @@ def revisar(cfg: dict) -> list[tuple[str, str]]:
         r.append(("falta", f"IA: sin clave de API para {', '.join(sin_clave)} (Consola → Administración → IA)"))
     else:
         r.append(("bien", "IA: " + " → ".join(f"{p['proveedor']} {p['modelo']}" for p in aj["ia"])))
+    # el catálogo entero va en las instrucciones: un Ollama con poco contexto lo recibe cortado, sin avisar
+    if Path(cfg["playbooks"]).is_dir():
+        catalogo = ajustes.catalogo_activo(cat.cargar(cfg["playbooks"]), aj)
+        largo = max(len(ia.instrucciones(catalogo, so, aj["categorias"])) for so in ("linux", "windows", "macos"))
+        for p in aj["ia"]:
+            ctx = int(p.get("contexto") or ia.CONTEXTO)
+            if p["proveedor"] == "ollama" and largo > ctx * ia.CATALOGO_MAX / ia.CONTEXTO:
+                r.append(("falta", f"IA: Ollama {p['modelo']} tiene contexto {ctx} y el catálogo no cabe: súbelo a "
+                                   f"{ia.CONTEXTO} en Consola → Administración → IA"))
     r.append(("bien", "Correo: códigos de acceso por correo") if cfg.get("smtp") else
              ("aviso", "Correo: sin [smtp]; los códigos de acceso los genera soporte en la consola"))
     return r
