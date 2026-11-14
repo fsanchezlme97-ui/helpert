@@ -1,0 +1,21 @@
+[project]
+name = "helpert-server"
+version = "0.1.0"
+description = "Servidor de Helpert: casos, capa de IA y autorización de playbooks"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "cryptography",
+    "psycopg[binary]>=3.3.9",
+]
+
+[project.scripts]
+helpert-server = "helpert_server.cli:main"
+
+[dependency-groups]
+dev = ["pytest", "httpx"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

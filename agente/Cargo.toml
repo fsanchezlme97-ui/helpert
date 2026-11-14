@@ -1,0 +1,13 @@
+[package]
+name = "agente"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ed25519-dalek = "3.0.0"
+libc = "0.2.191"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha2 = "0.11.1"
+toml = "1.2.1"
+ureq = { version = "3.5.2", features = ["json"] }

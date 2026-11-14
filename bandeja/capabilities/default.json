@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "La ventana de chat solo llama a los comandos propios de la bandeja.",
+  "windows": ["chat"],
+  "permissions": ["core:default"]
+}

@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Helpert · soporte TI</title>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body class="flex h-svh flex-col overflow-hidden bg-background">
+
+<!-- Inicio de sesión (como OneDrive): correo y código. -->
+<section id="vista-entrar" class="flex flex-1 flex-col items-center justify-center overflow-y-auto px-8 py-10" hidden>
+  <picture><source srcset="logo-oscuro.svg" media="(prefers-color-scheme: dark)"><img src="logo-claro.svg" alt="" class="size-16"></picture>
+  <h1 class="mt-4 text-xl font-semibold tracking-tight">Bienvenido a Helpert</h1>
+  <p class="mt-1 max-w-72 text-center text-sm text-balance text-muted-foreground">Inicia sesión con tu correo de trabajo para pedir ayuda a soporte.</p>
+  <form id="form-correo" class="mt-7 grid w-full max-w-72 gap-3">
+    <label class="etiqueta" for="correo">Correo</label>
+    <input class="campo" id="correo" type="email" autocomplete="email" placeholder="nombre@empresa.com" required maxlength="200">
+    <button class="btn btn-primario w-full">Continuar</button>
+  </form>
+  <form id="form-codigo" class="mt-7 grid w-full max-w-72 gap-3" hidden>
+    <p id="codigo-ayuda" class="text-sm text-muted-foreground"></p>
+    <label class="etiqueta" for="codigo">Código</label>
+    <input class="campo text-center font-mono text-lg tracking-[0.3em] uppercase" id="codigo" autocomplete="one-time-code"
+           required maxlength="12" spellcheck="false">
+    <button class="btn btn-primario w-full">Entrar</button>
+    <button type="button" id="otro-correo" class="btn btn-fantasma btn-sm w-full">Usar otro correo</button>
+  </form>
+  <p id="entrar-error" class="mt-4 max-w-72 text-center text-sm text-peligro" role="alert"></p>
+</section>
+
+<!-- La aplicación, con sesión. -->
+<div id="vista-app" class="flex min-h-0 flex-1 flex-col" hidden>
+<header class="flex items-center gap-3 border-b bg-card/60 px-4 py-3">
+  <picture><source srcset="logo-oscuro.svg" media="(prefers-color-scheme: dark)"><img src="logo-claro.svg" alt="" class="size-9"></picture>
+  <div class="min-w-0 flex-1 leading-tight">
+    <h1 class="text-sm font-semibold">Helpert</h1>
+    <p class="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+      <span class="size-1.5 shrink-0 rounded-full bg-exito"></span><span id="quien" class="truncate">Soporte TI · Nivel 1</span>
+    </p>
+  </div>
+</header>
+
+<nav class="grid grid-cols-4 border-b bg-card/60 px-2" aria-label="Secciones">
+  <button type="button" class="pestana-b" data-vista="chat" aria-current="page">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Chat</button>
+  <button type="button" class="pestana-b" data-vista="casos">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3 3h4l3-3h4"/><path d="M5.5 5h13l2.5 7v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6z"/></svg>Mis casos
+    <span id="pendiente-punto" class="absolute right-3 top-2 size-2 rounded-full bg-peligro" hidden><span class="sr-only">, tienes un caso por calificar</span></span></button>
+  <button type="button" class="pestana-b" data-vista="ayuda">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>Ayuda</button>
+  <button type="button" class="pestana-b" data-vista="perfil">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Perfil</button>
+</nav>
+
+<section id="vista-chat" class="flex min-h-0 flex-1 flex-col">
+  <main id="log" class="flex-1 space-y-4 overflow-y-auto px-4 py-5" aria-live="polite">
+    <section id="bienvenida" class="flex flex-col items-center px-2 pt-6 text-center">
+      <picture><source srcset="logo-oscuro.svg" media="(prefers-color-scheme: dark)"><img src="logo-claro.svg" alt="" class="size-16"></picture>
+      <h2 id="saludo" class="mt-3 text-lg font-semibold tracking-tight">Hola, soy Helpert</h2>
+      <p class="mt-1 max-w-xs text-sm text-balance text-muted-foreground">
+        Cuéntame qué le pasa a tu equipo. Reviso, te digo qué encontré y no cambio nada sin tu permiso.
+      </p>
+      <div class="mt-5 flex flex-wrap justify-center gap-2" id="sugerencias">
+        <button type="button" class="btn btn-borde btn-sm rounded-full font-normal">Mi impresora no imprime</button>
+        <button type="button" class="btn btn-borde btn-sm rounded-full font-normal">No tengo internet</button>
+        <button type="button" class="btn btn-borde btn-sm rounded-full font-normal">Me quedé sin espacio en el disco</button>
+        <button type="button" class="btn btn-borde btn-sm rounded-full font-normal">No encuentro un archivo</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="acciones" class="flex flex-wrap gap-2 border-t bg-card/60 px-4 py-3 outline-none" tabindex="-1" aria-label="Respuestas" hidden></div>
+
+  <form id="form" class="border-t bg-card/60 p-3">
+    <div class="flex items-end gap-2 rounded-xl border bg-background p-1.5 shadow-xs transition-[box-shadow,border-color]
+                focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 dark:bg-input/30">
+      <label for="texto" class="sr-only">Tu mensaje</label>
+      <textarea id="texto" rows="1" maxlength="2000" required placeholder="Escribe tu problema…"
+        class="max-h-32 min-h-9 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none placeholder:text-muted-foreground"></textarea>
+      <button id="enviar" type="submit" class="btn btn-primario btn-icono rounded-lg" aria-label="Enviar">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
+      </button>
+    </div>
+    <p class="mt-1.5 px-1 text-xs text-muted-foreground">Enter para enviar · Shift + Enter para una línea nueva</p>
+  </form>
+</section>
+
+<section id="vista-casos" class="flex-1 overflow-y-auto px-4 py-5" hidden>
+  <h2 class="text-base font-semibold">Mis casos</h2>
+  <p class="mt-0.5 text-sm text-muted-foreground">Tus pedidos de ayuda y cómo terminaron.</p>
+  <ul id="lista-casos" class="mt-4 grid gap-2"></ul>
+</section>
+
+<section id="vista-ayuda" class="flex-1 space-y-4 overflow-y-auto px-4 py-5" hidden>
+  <div>
+    <h2 class="text-base font-semibold">Ayuda</h2>
+    <p class="mt-0.5 text-sm text-muted-foreground">Si Helpert no puede resolverlo, una persona de soporte te atiende.</p>
+  </div>
+  <div class="tarjeta gap-3 py-4">
+    <p class="px-4 text-sm font-medium" id="empresa-nombre">Soporte</p>
+    <dl id="contacto" class="grid gap-2 px-4 text-sm"></dl>
+  </div>
+  <div class="tarjeta gap-3 py-4" id="remoto-caja">
+    <div class="px-4">
+      <p class="text-sm font-medium">Soporte remoto</p>
+      <p class="mt-0.5 text-sm text-muted-foreground">Si soporte te lo pide, abre el programa y dale tu ID. Tú aceptas cada conexión.</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2 px-4">
+      <code id="remoto-id" class="codigo select-all px-2.5 py-1.5"></code>
+      <button type="button" id="abrir-remoto" class="btn btn-primario btn-sm">Abrir</button>
+    </div>
+  </div>
+</section>
+
+<section id="vista-perfil" class="flex-1 overflow-y-auto px-4 py-5" hidden>
+  <h2 class="text-base font-semibold">Perfil</h2>
+  <p id="perfil-correo" class="mt-0.5 text-sm text-muted-foreground"></p>
+  <form id="form-perfil" class="mt-5 grid gap-4">
+    <div class="grid gap-2"><label class="etiqueta" for="p-nombre">Nombre</label>
+      <input class="campo" id="p-nombre" maxlength="120" autocomplete="name"></div>
+    <div class="grid gap-2"><label class="etiqueta" for="p-telefono">Teléfono o anexo</label>
+      <input class="campo" id="p-telefono" maxlength="40" autocomplete="tel"></div>
+    <div class="grid gap-2"><label class="etiqueta" for="p-sede">Sede donde trabajas</label>
+      <select class="campo" id="p-sede"></select>
+      <p class="text-xs text-muted-foreground">Así el técnico sabe a dónde ir si hace falta una visita.</p></div>
+    <div class="flex items-center gap-3"><button class="btn btn-primario">Guardar</button>
+      <span id="perfil-ok" class="text-sm text-exito" role="status"></span></div>
+  </form>
+  <div class="separador my-6"></div>
+  <button type="button" id="salir" class="btn btn-borde w-full">Cerrar sesión</button>
+</section>
+</div>
+
+<p id="sin-servicio" class="m-auto max-w-72 px-6 text-center text-sm text-peligro" role="alert" hidden></p>
+<script src="app.js"></script>
+</body>
+</html>

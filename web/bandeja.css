@@ -1,0 +1,11 @@
+/* Hoja de la ventana de chat de la bandeja. Compilar: npm run build (genera bandeja/ui/estilo.css). */
+@import "tailwindcss" source(none);
+@source "../bandeja/ui";
+@import "./tema.css";
+
+@layer components {
+  /* Pestañas inferiores de la bandeja (Chat, Mis casos, Ayuda, Perfil) */
+  .pestana-b { @apply relative flex flex-col items-center gap-0.5 py-2 text-xs font-medium text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:text-foreground aria-[current=page]:text-primary; }
+  .pestana-b svg { @apply size-4 fill-none stroke-current; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .pestana-b[aria-current=page]::after { content: ""; @apply absolute inset-x-5 bottom-0 h-0.5 rounded-full bg-primary; }
+}

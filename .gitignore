@@ -1,0 +1,15 @@
+.dev/
+.dev-pruebas/
+agente/target/
+server/.venv/
+__pycache__/
+*.db
+*.db-*
+# Las firmas las genera quien tiene la clave privada (CI o el Analista N2), no se versionan.
+firma.ed25519
+*.key
+server/helpert-server.toml
+bandeja/target/
+*.run
+.playwright-mcp/
+web/node_modules/

@@ -1,0 +1,16 @@
+id = "print.clear-queue"
+version = "0.1.0"
+nombre = "Liberar cola de impresión"
+descripcion = "El usuario no puede imprimir, los documentos se quedan en cola o la impresora aparece en pausa. Borra los trabajos atascados, reactiva impresoras pausadas y reinicia el servicio de impresión. No sirve para papel atascado dentro de la impresora ni para tóner: eso necesita a un técnico."
+riesgo = "bajo"
+deshacer = false   # los trabajos atascados se pierden; el diagnóstico dice cuáles
+timeout = 120
+
+[sistemas]
+linux = "linux.sh"
+# windows = "windows.ps1"   pendiente (pruebas en VM)
+
+[parametros.impresora]
+tipo = "texto"
+requerido = false
+max = 100

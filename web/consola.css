@@ -1,0 +1,75 @@
+/* Hoja de la consola web. Compilar: npm run build (genera server/helpert_server/estatico/consola.css). */
+@import "tailwindcss" source(none);
+@source "../server/helpert_server/consola.py";
+@source "./consola.js";
+@import "./tema.css";
+/* CSS base de las librerías en la capa base: los estilos de abajo (capa components) siempre ganan. */
+@import "../web/node_modules/datatables.net-dt/css/dataTables.dataTables.css" layer(base);
+@import "../web/node_modules/choices.js/public/assets/styles/choices.css" layer(base);
+
+/* DataTables 3 con aspecto shadcn */
+@layer components {
+  .dt-container { @apply text-sm; }
+  .dt-container .dt-layout-row { @apply m-0 flex flex-wrap items-center justify-between gap-3; }
+  .dt-container .dt-layout-row:not(.dt-layout-table) { @apply px-4 py-3; }
+  .dt-container .dt-layout-row:not(.dt-layout-table):last-child { @apply border-t; }
+  .dt-container .dt-info { @apply text-muted-foreground; }
+  .dt-container .dt-paging nav { @apply flex items-center gap-1; }
+  .dt-container .dt-paging .dt-paging-button {
+    @apply m-0 inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-transparent bg-transparent px-2.5
+      text-sm font-medium text-foreground shadow-none transition-colors;
+  }
+  .dt-container .dt-paging .dt-paging-button:hover:not(.disabled) { @apply border-transparent bg-accent text-accent-foreground; background-image: none; }
+  .dt-container .dt-paging .dt-paging-button.current,
+  .dt-container .dt-paging .dt-paging-button.current:hover { @apply border-border bg-background shadow-xs dark:bg-input/30; background-image: none; }
+  .dt-container .dt-paging .dt-paging-button.disabled { @apply text-muted-foreground opacity-50; }
+  .dt-container .dt-length select { @apply mr-2 h-8 rounded-md border border-input bg-transparent px-2 text-sm shadow-xs dark:bg-input/30; }
+  table.dataTable { @apply border-collapse; }
+  table.dataTable > thead > tr > th, table.dataTable > thead > tr > td { @apply border-b border-border px-3 py-2.5; }
+  table.dataTable > tbody > tr > td { @apply px-3 py-3; }
+  table.dataTable > tbody > tr { @apply bg-transparent; }
+  table.dataTable.hover > tbody > tr:hover > *, table.dataTable.display > tbody > tr:hover > * { box-shadow: none; @apply bg-muted/50; }
+  table.dataTable > tbody > tr[data-href] { @apply cursor-pointer; }
+  table.dataTable.no-footer { @apply border-b-0; }
+  table.dataTable thead > tr > th.dt-orderable-asc:hover, table.dataTable thead > tr > th.dt-orderable-desc:hover { outline: none; @apply text-foreground; }
+  div.dt-container div.dt-layout-table > div { @apply m-0; }
+  .dt-empty { @apply py-10 text-center text-muted-foreground; }
+  /* DataTables alinea a la derecha los números; en shadcn el texto va a la izquierda salvo que la celda diga text-right */
+  table.dataTable th.dt-type-numeric, table.dataTable td.dt-type-numeric,
+  table.dataTable th.dt-type-date, table.dataTable td.dt-type-date { text-align: left; }
+  table.dataTable thead th.dt-type-numeric div.dt-column-header,
+  table.dataTable thead th.dt-type-date div.dt-column-header { flex-direction: row; }
+  table.dataTable th.text-right, table.dataTable td.text-right { text-align: right; }
+  table.dataTable thead th.text-right div.dt-column-header { flex-direction: row-reverse; }
+}
+
+/* Choices.js con aspecto shadcn (Select / Combobox) */
+@layer components {
+  .choices { @apply mb-0 min-w-52 text-sm; }
+  .choices__inner {
+    @apply min-h-9 rounded-md border border-input bg-transparent px-2 py-1 text-sm shadow-xs dark:bg-input/30;
+  }
+  .choices.is-focused .choices__inner, .choices.is-open .choices__inner { @apply border-ring ring-[3px] ring-ring/50; border-radius: var(--radius-md); }
+  .choices__list--single { @apply px-1 py-1; }
+  .choices__input { @apply mb-0 bg-transparent text-sm text-foreground placeholder:text-muted-foreground; }
+  .choices__list--multiple .choices__item {
+    @apply mb-0 mr-1 rounded-md border-0 bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground;
+  }
+  .choices[data-type*="select-multiple"] .choices__button, .choices[data-type*="text"] .choices__button {
+    @apply ml-1 border-l-0 pl-3 opacity-60 hover:opacity-100 dark:invert;
+  }
+  .choices__list--dropdown, .choices__list[aria-expanded] {
+    @apply z-50 mt-1 overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md;
+    word-break: normal;
+  }
+  .is-open .choices__list--dropdown, .is-open .choices__list[aria-expanded] { @apply border-border; }
+  .choices__list--dropdown .choices__item, .choices__list[aria-expanded] .choices__item { @apply rounded-sm px-2 py-1.5 text-sm; }
+  .choices__list--dropdown .choices__list, .choices__list[aria-expanded] .choices__list { @apply p-1; }
+  .choices__list--dropdown .choices__item--selectable.is-highlighted, .choices__list[aria-expanded] .choices__item--selectable.is-highlighted {
+    @apply bg-accent text-accent-foreground;
+  }
+  .choices__list--dropdown .choices__item--selectable.is-highlighted::after { @apply hidden; }
+  .choices__list--dropdown .choices__input, .choices__list[aria-expanded] .choices__input { @apply border-b border-border bg-transparent p-2; }
+  .choices[data-type*="select-one"]::after { @apply dark:invert; }
+  .choices__placeholder { @apply opacity-100 text-muted-foreground; }
+}

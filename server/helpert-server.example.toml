@@ -1,0 +1,39 @@
+# Copia este archivo como helpert-server.toml. La ruta de playbooks se resuelve desde esta carpeta.
+
+# PostgreSQL. En la nube (Supabase) la cadena lleva contraseña: ponla en una variable de entorno, no aquí.
+base_datos_env = "HELPERT_DB"     # p. ej. postgresql://postgres.xxxx:CLAVE@aws-0-....pooler.supabase.com:5432/postgres
+inscripcion_env = "HELPERT_INSCRIPCION" # clave con la que el instalador registra cada equipo (sin ella, /v1/inscribir no existe)
+# base_datos = "postgresql://helpert@/helpert?host=/ruta/al/socket"   # alternativa en desarrollo
+
+playbooks = "../playbooks"
+clave_publica = "/etc/helpert/playbooks.pub"  # comprueba las versiones del agente que se publican (publicar-agente)
+umbral_confianza = 0.7
+zona_horaria = "America/Lima"
+
+# Cadena de IA, en orden. Si ninguno responde, Helpert ofrece el menú sin IA.
+# Principal: una API en la nube con formato OpenAI. La clave va en la variable de entorno, nunca aquí.
+[[ia]]
+proveedor = "openai-compatible"
+modelo = "gpt-4o-mini"
+url = "https://api.openai.com/v1"
+clave_env = "HELPERT_IA_CLAVE"
+timeout = 30
+# Mismo adaptador, otros proveedores (sin probar aún):
+#   Gemini:    url = "https://generativelanguage.googleapis.com/v1beta/openai"
+#   Anthropic: url = "https://api.anthropic.com/v1"
+#   OpenRouter, Groq, DeepSeek, Mistral: su URL /v1
+
+# Respaldo: Ollama. En una VPS sin GPU será lento; mídelo antes de confiar en él.
+[[ia]]
+proveedor = "ollama"
+modelo = "gemma4:e4b"
+url = "http://localhost:11434"
+timeout = 60
+
+# Códigos de acceso de la bandeja por correo. Sin este bloque, los códigos los genera soporte en la consola.
+# La contraseña va en la variable HELPERT_SMTP_CLAVE (o la que diga clave_env), nunca aquí.
+# [smtp]
+# host = "smtp.ejemplo.pe"
+# puerto = 587
+# usuario = "helpert@ejemplo.pe"
+# remitente = "Helpert <helpert@ejemplo.pe>"

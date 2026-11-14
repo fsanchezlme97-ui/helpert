@@ -1,0 +1,15 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Helpert",
+  "version": "0.1.0",
+  "identifier": "pe.helpert.bandeja",
+  "build": { "frontendDist": "ui" },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      { "label": "chat", "title": "Helpert · soporte TI", "width": 420, "height": 620, "minWidth": 340, "minHeight": 420, "visible": false }
+    ],
+    "security": { "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; connect-src ipc: http://ipc.localhost" }
+  },
+  "bundle": { "active": false, "icon": ["iconos/logo-claro.png"] }
+}

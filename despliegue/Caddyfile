@@ -1,0 +1,7 @@
+# Caddy en la VPS: certificado HTTPS automático y proxy al servidor de Helpert (que solo escucha en 127.0.0.1).
+# Cambia el dominio y apunta su registro DNS a la VPS. Sin probar aún (Caddy no está en el equipo de desarrollo).
+helpert.ejemplo.pe {
+	encode gzip
+	reverse_proxy 127.0.0.1:8000
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+}

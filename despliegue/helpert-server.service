@@ -1,0 +1,25 @@
+# /etc/systemd/system/helpert-server.service · servidor de Helpert en la VPS (sin probar aún).
+# Requiere: usuario «helpert», el repositorio en /opt/helpert, uv instalado y /etc/helpert/servidor.env con:
+#   HELPERT_DB=postgresql://...        (cadena de Supabase)
+#   HELPERT_CLAVE_MAESTRA=...          (cifra las claves de API guardadas en la consola; 32 bytes en base64 url:
+#                                       head -c 32 /dev/urandom | base64 | tr '+/' '-_')
+#   HELPERT_IA_CLAVE=...               (opcional: clave de la API de IA en variable, en vez de guardarla en la consola)
+[Unit]
+Description=Helpert · servidor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=helpert
+WorkingDirectory=/opt/helpert/server
+EnvironmentFile=/etc/helpert/servidor.env
+ExecStart=/usr/bin/env uv run --frozen helpert-server --config /etc/helpert/helpert-server.toml servir --host 127.0.0.1 --puerto 8000
+Restart=on-failure
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ReadWritePaths=/opt/helpert/server/.venv /home/helpert/.cache/uv
+
+[Install]
+WantedBy=multi-user.target

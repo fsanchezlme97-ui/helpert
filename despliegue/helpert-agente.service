@@ -1,0 +1,14 @@
+# /etc/systemd/system/helpert-agente.service · agente en cada equipo Linux (lo instala despliegue/instalar-agente-linux.sh).
+# /etc/helpert/agente.toml (permisos 600, dueño root): servidor = "https://helpert.ejemplo.pe", token, playbooks,
+# clave_publica = "/etc/helpert/playbooks.pub", socket = "/run/helpert/agente.sock".
+[Unit]
+Description=Helpert · agente del equipo
+After=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/helpert-agente /etc/helpert/agente.toml
+RuntimeDirectory=helpert
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

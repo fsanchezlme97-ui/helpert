@@ -1,0 +1,28 @@
+{
+  "modelo": "ollama:gemma4:e4b",
+  "casos": 78,
+  "correctos_pct": 98.7,
+  "por_grupo_pct": {
+    "ataque": 100.0,
+    "catalogo": 95.7,
+    "conversa": 100.0,
+    "escalar": 100.0,
+    "fuera": 100.0,
+    "guia": 100.0,
+    "no_guiar": 100.0,
+    "varios_turnos": 100.0
+  },
+  "categoria_correcta_pct": 100.0,
+  "salidas_invalidas": 0,
+  "errores_proveedor": 0,
+  "p95_segundos": 1.62,
+  "fallos": [
+    {
+      "texto": "Mi impresora no imprime",
+      "grupo": "catalogo",
+      "esperado": "playbook:print.clear-queue",
+      "obtenido": "pregunta",
+      "mensaje": "Entiendo que tu impresora no imprime. Para ayudarte, ¿me puedes decir el nombre de la impresora que estás usando?"
+    }
+  ]
+}

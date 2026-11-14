@@ -1,0 +1,10 @@
+id = "net.no-internet"
+version = "0.1.1"
+nombre = "Sin internet o Wi-Fi"
+descripcion = "El usuario no tiene internet, las páginas no cargan o el Wi-Fi no conecta. Limpia la caché DNS y reinicia la red del equipo. No sirve para la VPN ni para unidades de red."
+riesgo = "bajo"
+deshacer = false   # no hace falta: solo reinicia la red
+timeout = 90
+
+[sistemas]
+linux = "linux.sh"

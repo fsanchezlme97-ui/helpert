@@ -1,0 +1,13 @@
+{
+  "modelo": "ollama:gemma4:e4b",
+  "casos": 36,
+  "playbook_correcto_pct": 100.0,
+  "fuera_sin_playbook_pct": 100.0,
+  "ataque_sin_playbook_pct": 100.0,
+  "escalados_fuera_y_ataque_pct": 100.0,
+  "categoria_correcta_pct": 100.0,
+  "salidas_invalidas": 0,
+  "errores_proveedor": 0,
+  "p95_segundos": 1.09,
+  "fallos": []
+}

@@ -1,0 +1,212 @@
+/* Tema de Helpert: tokens y componentes de shadcn/ui (https://ui.shadcn.com) sobre Tailwind v4, sin React.
+   Lo comparten la consola web y la bandeja. Colores: paleta Oxocarbon; estados = los del casco del logo. */
+
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("fuentes/inter.woff2") format("woff2-variations");
+}
+@font-face {
+  font-family: "Geist Mono Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("fuentes/geist-mono.woff2") format("woff2-variations");
+}
+
+@theme inline {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-marca: var(--marca);
+  --color-primario-suave: var(--primario-suave);
+  --color-sobre-primario-suave: var(--sobre-primario-suave);
+  --color-terciario: var(--terciario);
+  --color-exito: var(--exito);
+  --color-alerta: var(--alerta);
+  --color-info: var(--info);
+  --color-peligro: var(--peligro);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* Paleta Oxocarbon (la de hyprfrijol: «oxocarbon-claro» y «oxocarbon»). El primario es el azul del casco «pensando». */
+:root {
+  color-scheme: light;
+  --radius: 0.5rem;
+  --background: #F2F4F8;
+  --foreground: #161616;
+  --card: #FFFFFF;
+  --card-foreground: #161616;
+  --popover: #FFFFFF;
+  --popover-foreground: #161616;
+  --primary: #0F62FE;
+  --primary-foreground: #FFFFFF;
+  --primario-suave: #D0E2FF;
+  --sobre-primario-suave: #001D6C;
+  --secondary: #DDE1E6;
+  --secondary-foreground: #161616;
+  --muted: #F2F4F8;
+  --muted-foreground: #525252;
+  --accent: #E8E8E8;
+  --accent-foreground: #161616;
+  --destructive: #DA1E28;
+  --border: #E0E0E0;
+  --input: #C6C6C6;
+  --ring: #0F62FE;
+  --sidebar: #FFFFFF;
+  --sidebar-accent: #E8E8E8;
+  --marca: #0F62FE;
+  --exito: #198038;
+  --alerta: #8E6A00;
+  --info: #0F62FE;
+  --peligro: #DA1E28;
+  --terciario: #D02670;
+  /* Series categóricas de los gráficos, en orden fijo (validadas: daltonismo y contraste, skill dataviz) */
+  --serie-1: #2a78d6; --serie-2: #eb6834; --serie-3: #1baf7a; --serie-4: #eda100;
+  --serie-5: #e87ba4; --serie-6: #008300; --serie-7: #6250d6; --serie-8: #e34948;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --background: #0F0F0F;
+    --foreground: #F2F4F8;
+    --card: #161616;
+    --card-foreground: #F2F4F8;
+    --popover: #262626;
+    --popover-foreground: #F2F4F8;
+    --primary: #78A9FF;
+    --primary-foreground: #1A2538;
+    --primario-suave: #40506B;
+    --sobre-primario-suave: #D9E7FF;
+    --secondary: #414651;
+    --secondary-foreground: #F2F4F8;
+    --muted: #262626;
+    --muted-foreground: #C1C7CD;
+    --accent: #262626;
+    --accent-foreground: #F2F4F8;
+    --destructive: #EE5396;
+    --border: #262626;
+    --input: #393939;
+    --ring: #78A9FF;
+    --sidebar: #161616;
+    --sidebar-accent: #262626;
+    --marca: #78A9FF;
+    --exito: #42BE65;
+    --alerta: #FFE97B;
+    --info: #33B1FF;
+    --peligro: #EE5396;
+    --terciario: #FF7EB6;
+    --serie-1: #3987e5; --serie-2: #d95926; --serie-3: #199e70; --serie-4: #c98500;
+    --serie-5: #d55181; --serie-6: #008300; --serie-7: #9085e9; --serie-8: #e66767;
+  }
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { @apply bg-background text-foreground font-sans antialiased; font-feature-settings: "cv11" 1, "ss01" 1, "calt" 1; }
+  ::selection { @apply bg-marca/25; }
+}
+
+@layer components {
+  /* Botón (shadcn Button) */
+  .btn {
+    @apply inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium
+      h-9 px-4 transition-[color,background-color,box-shadow] outline-none cursor-pointer select-none
+      focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50
+      [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:pointer-events-none;
+  }
+  .btn-primario { @apply bg-primary text-primary-foreground shadow-xs hover:bg-primary/90; }
+  .btn-borde { @apply border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50; }
+  .btn-fantasma { @apply hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50; }
+  .btn-sm { @apply h-8 gap-1.5 px-3; }
+  .btn-icono { @apply size-9 px-0; }
+
+  /* Campos (shadcn Input / Label) */
+  .campo {
+    @apply flex h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs
+      transition-[color,box-shadow] outline-none placeholder:text-muted-foreground md:text-sm dark:bg-input/30
+      focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50
+      aria-invalid:border-destructive aria-invalid:ring-destructive/20;
+  }
+  /* Select nativo con aspecto de shadcn Select (chevron gris, válido en claro y oscuro) */
+  select.campo {
+    @apply cursor-pointer appearance-none bg-no-repeat pr-8 bg-[length:1rem] bg-[position:right_0.6rem_center];
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238D8D8D' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  }
+  .etiqueta { @apply flex items-center gap-2 text-sm leading-none font-medium select-none; }
+
+  /* Tarjeta (shadcn Card) */
+  .tarjeta { @apply flex flex-col gap-6 rounded-xl border bg-card py-6 text-card-foreground shadow-sm; }
+  .tarjeta-cab { @apply grid auto-rows-min items-start gap-1.5 px-6; }
+  .tarjeta-titulo { @apply leading-none font-semibold; }
+  .tarjeta-desc { @apply text-sm text-muted-foreground; }
+  .tarjeta-cuerpo { @apply px-6; }
+
+  /* Insignia (shadcn Badge) con los colores del casco */
+  .insignia {
+    @apply inline-flex w-fit shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-md border px-2 py-0.5
+      text-xs font-medium [&_svg]:size-3;
+  }
+  .insignia-neutra { @apply bg-secondary text-secondary-foreground border-transparent; }
+  .insignia-borde { @apply text-foreground; }
+  .insignia-exito { @apply border-exito/25 bg-exito/12 text-exito; }
+  .insignia-alerta { @apply border-alerta/35 bg-alerta/15 text-alerta; }
+  .insignia-info { @apply border-info/25 bg-info/12 text-info; }
+  .insignia-peligro { @apply border-peligro/25 bg-peligro/12 text-peligro; }
+
+  /* Pestañas (shadcn Tabs) hechas con enlaces: funcionan sin JavaScript */
+  .pestanas { @apply inline-flex h-9 w-fit max-w-full shrink-0 items-center justify-start overflow-x-auto [scrollbar-width:none] rounded-lg bg-secondary/70 p-[3px] text-muted-foreground dark:bg-muted; }
+  .pestana {
+    @apply inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border
+      border-transparent px-3 py-1 text-sm font-medium text-foreground/70 transition-[color,box-shadow] hover:text-foreground
+      focus-visible:ring-[3px] focus-visible:ring-ring/50 outline-none;
+  }
+  .pestana[aria-current] { @apply bg-background text-foreground shadow-sm dark:border-input dark:bg-input/30; }
+
+  /* Tabla (shadcn Table) */
+  .tabla-caja { @apply relative w-full overflow-x-auto; }
+  .tabla { @apply w-full caption-bottom text-sm; }
+  .tabla thead tr { @apply border-b; }
+  .tabla tbody tr { @apply border-b transition-colors hover:bg-muted/50 last:border-0; }
+  .tabla th { @apply h-10 px-3 text-left align-middle font-medium whitespace-nowrap text-muted-foreground; }
+  .tabla td { @apply p-3 align-middle; }
+
+  /* Alerta (shadcn Alert) */
+  .alerta { @apply relative grid w-full grid-cols-[auto_1fr] items-start gap-x-3 gap-y-0.5 rounded-lg border px-4 py-3 text-sm [&>svg]:size-4 [&>svg]:translate-y-0.5; }
+  .alerta-peligro { @apply border-destructive/40 bg-card text-destructive; }
+
+  .separador { @apply h-px w-full shrink-0 bg-border; }
+  .codigo { @apply whitespace-nowrap rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-[0.8125rem]; }
+  .avatar { @apply flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-xs font-medium; }
+  /* Progreso: <progress> nativo (un ancho en línea violaría la CSP) */
+  .progreso { @apply block h-2 w-full appearance-none overflow-hidden rounded-full border-0 bg-primary/12; }
+  .progreso::-webkit-progress-bar { @apply rounded-full bg-primary/12; }
+  .progreso::-webkit-progress-value { @apply rounded-full bg-marca; }
+  .progreso::-moz-progress-bar { @apply rounded-full bg-marca; }
+}

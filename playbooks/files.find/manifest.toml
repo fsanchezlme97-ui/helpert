@@ -1,0 +1,16 @@
+id = "files.find"
+version = "0.1.0"
+nombre = "Buscar un archivo"
+descripcion = "La persona no encuentra un archivo, documento o carpeta que guardó. Busca por una parte del nombre en la carpeta personal de la persona (también en la papelera) y muestra dónde está y cuándo se modificó. Solo busca: no mueve, abre ni cambia nada. El parámetro nombre es una palabra del nombre del archivo, sin espacios ni extensión si no la sabe (por ejemplo informe, factura_marzo, presupuesto)."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
+
+[parametros.nombre]
+tipo = "texto"
+requerido = true
+max = 60
+pregunta = "¿Cómo se llama el archivo? Con una palabra de su nombre me basta."
