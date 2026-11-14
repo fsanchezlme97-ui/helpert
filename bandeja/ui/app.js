@@ -17,15 +17,10 @@ function el(etiqueta, clase, contenido) {
 }
 
 function avatar() {
-  const pic = el("picture", "mt-0.5 shrink-0");
-  const src = el("source");
-  src.srcset = "logo-oscuro.svg";
-  src.media = "(prefers-color-scheme: dark)";
-  const img = el("img", "size-7");
-  img.src = "logo-claro.svg";
+  const img = el("img", "mt-0.5 size-7 shrink-0");
+  img.src = "icono.png";
   img.alt = "";
-  pic.append(src, img);
-  return pic;
+  return img;
 }
 
 // quien: "tu" | "helpert" | "error"; contenido: texto o nodos.

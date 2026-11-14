@@ -1,0 +1,15 @@
+id = "net.vpn"
+version = "0.1.0"
+nombre = "Conectar la VPN"
+descripcion = "La VPN de la empresa no conecta o se desconectó, y por eso no abren los sistemas internos. Revisa las VPN configuradas en el equipo y conecta la que esté caída. El parámetro vpn es el nombre de la conexión, solo si la persona lo dice. No sirve si la VPN nunca se configuró en este equipo ni para cambiar la contraseña de la VPN."
+riesgo = "bajo"
+deshacer = false
+timeout = 90
+
+[sistemas]
+linux = "linux.sh"
+
+[parametros.vpn]
+tipo = "texto"
+requerido = false
+max = 60

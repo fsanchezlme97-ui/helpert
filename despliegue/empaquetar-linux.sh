@@ -27,7 +27,7 @@ mkdir "$D/bin"
 cp "$RAIZ"/agente/target/release/{helpert-agente,helpert} "$RAIZ/bandeja/target/release/helpert-bandeja" "$D/bin/"
 cp -r "$RAIZ/playbooks" "$D/playbooks"
 cp "$PUB" "$D/playbooks.pub"
-cp "$RAIZ/bandeja/iconos/logo-claro.svg" "$D/helpert.svg"
+cp "$RAIZ/bandeja/iconos/icono.png" "$D/helpert.png"
 cp "$RAIZ/despliegue/helpert-agente.service" "$RAIZ/despliegue/instalar-agente-linux.sh" "$D/"
 printf '%s\n' "$SERVIDOR" > "$D/servidor.txt"
 (umask 077; cp "$INSCRIPCION_F" "$D/inscripcion")

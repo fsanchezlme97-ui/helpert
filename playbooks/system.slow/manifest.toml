@@ -1,0 +1,10 @@
+id = "system.slow"
+version = "0.1.0"
+nombre = "Revisar por qué el equipo está lento"
+descripcion = "El equipo está lento, se traba o los programas tardan en abrir. Revisa el uso de procesador, memoria y disco, los programas que más consumen y cuántos días lleva sin reiniciarse, y dice qué hacer. Solo revisa: no cierra ni cambia nada."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"

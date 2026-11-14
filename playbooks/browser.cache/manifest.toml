@@ -1,0 +1,10 @@
+id = "browser.cache"
+version = "0.1.0"
+nombre = "Limpiar la caché del navegador"
+descripcion = "Una página web se ve mal, no carga bien, muestra una versión vieja o el navegador está lento. Borra solo la caché de Firefox, Chrome, Chromium, Edge y Brave de los navegadores que estén cerrados. No borra contraseñas, historial, marcadores ni sesiones iniciadas."
+riesgo = "bajo"
+deshacer = false   # la caché se vuelve a descargar sola
+timeout = 120
+
+[sistemas]
+linux = "linux.sh"

@@ -8,8 +8,22 @@ from conftest import RAIZ
 
 def test_carga_los_playbooks_reales():
     c = cat.cargar(RAIZ / "playbooks")
-    assert set(c) == {"print.clear-queue", "disk.free-space", "net.no-internet", "files.find"}
+    assert set(c) == {"print.clear-queue", "print.set-default", "disk.free-space", "net.no-internet", "net.wifi", "net.vpn",
+                      "net.network-drive", "files.find", "files.restore-trash", "audio.output", "audio.mic",
+                      "bluetooth.restart", "time.sync", "browser.cache", "app.close-hung", "system.slow", "usb.storage",
+                      "camera.check"}
     assert all("linux" in pb.sistemas for pb in c.values())
+    for pb in c.values():  # el modelo pregunta por el dato que falta con la pregunta del manifiesto
+        assert all(r.get("pregunta") for r in pb.parametros.values() if r.get("requerido")), pb.id
+
+
+def test_scripts_de_los_playbooks():
+    import subprocess
+    for pb in cat.cargar(RAIZ / "playbooks").values():
+        script = RAIZ / "playbooks" / pb.id / pb.sistemas["linux"]
+        assert subprocess.run(["bash", "-n", script]).returncode == 0, pb.id
+        r = subprocess.run(["bash", script, "paso-inventado"], capture_output=True, env={"PATH": "/usr/bin:/bin"})
+        assert r.returncode == 2, pb.id  # un paso que no existe nunca hace nada
 
 
 @pytest.mark.parametrize("valor", ["HP; rm -rf /", "$(reboot)", "a b", "x" * 101, "`id`"])

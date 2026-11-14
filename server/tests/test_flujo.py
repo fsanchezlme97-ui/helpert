@@ -152,9 +152,10 @@ def test_respaldo_si_falla_el_principal(servidor, falso):
 def test_sin_ia_ofrece_menu(servidor):
     cli = servidor(playbooks=RAIZ / "playbooks", ia_cfg=[{"proveedor": "off", "modelo": "-"}])
     r = enviar(cli)
-    assert r["estado"] == "menu" and "1. Liberar espacio en disco" in r["respuesta"]
-    assert "Buscar un archivo" not in r["respuesta"]  # necesita un nombre que sin IA no se puede pedir
-    r = enviar(cli, "1", r["caso_id"])
+    numero = {l.split(". ", 1)[1]: l.split(".")[0] for l in r["respuesta"].splitlines() if ". " in l}
+    assert r["estado"] == "menu" and "Liberar espacio en disco" in numero
+    assert "Buscar un archivo" not in numero  # necesita un nombre que sin IA no se puede pedir
+    r = enviar(cli, numero["Liberar espacio en disco"], r["caso_id"])
     assert r["trabajo"]["playbook"] == "disk.free-space"
 
 

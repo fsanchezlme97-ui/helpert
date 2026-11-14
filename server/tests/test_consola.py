@@ -109,7 +109,7 @@ def test_sin_documentacion_publica(servidor):
 
 def test_estaticos_propios(servidor):
     _, web = consola(servidor)
-    for archivo in ("consola.css", "consola.js", "datatables.js", "choices.js", "echarts.js", "logo-claro.svg", "logo-oscuro.svg", "fuentes/inter.woff2"):
+    for archivo in ("consola.css", "consola.js", "datatables.js", "choices.js", "echarts.js", "icono.png", "mascota.png", "fuentes/inter.woff2"):
         r = web.get(f"/consola/estatico/{archivo}")
         assert r.status_code == 200 and r.headers["x-content-type-options"] == "nosniff", archivo
     assert web.get("/consola/estatico/../app.py").status_code == 404

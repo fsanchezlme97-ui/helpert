@@ -10,13 +10,13 @@ RAIZ=$(cd "$(dirname "$0")/.." && pwd)
 UNIDAD=$(dirname "$0")/helpert-agente.service
 BIN=$RAIZ/agente/target/release
 BANDEJA=$RAIZ/bandeja/target/release/helpert-bandeja
-ICONO=$RAIZ/bandeja/iconos/logo-claro.svg
+ICONO=$RAIZ/bandeja/iconos/icono.png
 PB=$RAIZ/playbooks
 uso() { sed -n '3,6p' "$0"; exit 2; }
 while [ $# -gt 0 ]; do
   case $1 in
     --paquete) P=$2; SERVIDOR=$(cat "$P/servidor.txt"); PUB=$P/playbooks.pub; INSCRIPCION_F=$P/inscripcion
-               PB=$P/playbooks; BIN=$P/bin; BANDEJA=$P/bin/helpert-bandeja; ICONO=$P/helpert.svg; UNIDAD=$P/helpert-agente.service; shift 2 ;;
+               PB=$P/playbooks; BIN=$P/bin; BANDEJA=$P/bin/helpert-bandeja; ICONO=$P/helpert.png; UNIDAD=$P/helpert-agente.service; shift 2 ;;
     --servidor) SERVIDOR=$2; shift 2 ;;
     --token-archivo) TOKEN_F=$2; shift 2 ;;
     --inscripcion-archivo) INSCRIPCION_F=$2; shift 2 ;;
@@ -30,7 +30,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ "$(id -u)" -eq 0 ] || { echo "Ejecútalo con sudo."; exit 1; }
-BANDEJA_ARCHIVOS="/usr/local/bin/helpert-bandeja /etc/xdg/autostart/helpert-bandeja.desktop /usr/share/applications/helpert.desktop /usr/share/icons/hicolor/scalable/apps/helpert.svg"
+BANDEJA_ARCHIVOS="/usr/local/bin/helpert-bandeja /etc/xdg/autostart/helpert-bandeja.desktop /usr/share/applications/helpert.desktop /usr/share/icons/hicolor/256x256/apps/helpert.png /usr/share/icons/hicolor/scalable/apps/helpert.svg"  # el .svg: icono de versiones anteriores
 
 if [ "${DESINSTALAR:-}" ]; then
   systemctl disable --now helpert-agente 2>/dev/null || true
@@ -99,7 +99,7 @@ systemctl restart helpert-agente
 if [ -n "$BANDEJA" ]; then
   pkill -x helpert-bandeja 2>/dev/null || true  # la versión anterior; el instalador abre la nueva como el usuario
   install -Dm755 "$BANDEJA" /usr/local/bin/helpert-bandeja
-  install -Dm644 "$ICONO" /usr/share/icons/hicolor/scalable/apps/helpert.svg
+  install -Dm644 "$ICONO" /usr/share/icons/hicolor/256x256/apps/helpert.png
   ENTRADA='[Desktop Entry]
 Type=Application
 Name=Helpert

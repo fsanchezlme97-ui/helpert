@@ -83,6 +83,7 @@ ICONOS = {
     "prohibido": '<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>',
     "candado": '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
     "camara": '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
+    "cursor": '<path d="M4 4l7.07 17 2.51-7.39L21 11.07z"/>',
     "visitas": '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
     "subir": '<path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>',
     "empresa": '<path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/>',
@@ -115,9 +116,8 @@ def icono(nombre: str, clase: str = "size-4") -> str:
 
 
 def logo(clase: str = "size-8", alt: str = "") -> str:
-    """Logo (casco «pensando») con su versión para el tema oscuro."""
-    return (f'<picture class="shrink-0"><source srcset="{E}/logo-oscuro.svg" media="(prefers-color-scheme: dark)">'
-            f'<img src="{E}/logo-claro.svg" alt="{alt}" class="{clase}"></picture>')
+    """Logo: la cabeza de la mascota (se lee igual en los dos temas)."""
+    return f'<img src="{E}/icono.png" alt="{alt}" class="shrink-0 {clase}">'
 
 
 def insignia(texto: str, variante: str = "neutra", icono_: str = "") -> str:
@@ -205,7 +205,7 @@ def montar(app: FastAPI, cfg: dict) -> None:
         return HTMLResponse(
             f'<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" '
             f'content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark">{meta}'
-            f'<title>{e(titulo)} · Helpert</title><link rel="icon" href="{E}/logo-claro.svg" type="image/svg+xml">{estilos}{scripts}'
+            f'<title>{e(titulo)} · Helpert</title><link rel="icon" href="{E}/icono.png" type="image/png">{estilos}{scripts}'
             f'</head><body{f" data-refrescar={refrescar}" if refrescar else ""}>{cuerpo_html}</body></html>',
             status_code=estado, headers=CABECERAS)
 
@@ -513,6 +513,9 @@ def montar(app: FastAPI, cfg: dict) -> None:
             if m["rol"] == "usuario":
                 avatar = f'<span class="avatar">{icono("usuario", "size-4 text-muted-foreground")}</span>'
                 quien, burbuja = e(k["persona_nombre"] or k["persona_email"] or k["usuario"]), "bg-muted"
+            elif m["rol"] == "pantalla":
+                avatar = f'<span class="avatar">{icono("cursor", "size-4 text-muted-foreground")}</span>'
+                quien, burbuja = "Guía en pantalla", "border border-dashed bg-card"
             elif m["rol"] == "captura":
                 avatar = f'<span class="avatar">{icono("camara", "size-4 text-muted-foreground")}</span>'
                 quien, burbuja = "Captura (descrita por la IA)", "border border-dashed bg-card"

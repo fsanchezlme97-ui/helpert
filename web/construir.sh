@@ -17,6 +17,6 @@ cp node_modules/datatables.net/js/dataTables.min.js "$E/datatables.js"
 cp node_modules/choices.js/public/assets/scripts/choices.min.js "$E/choices.js"
 cp node_modules/echarts/dist/echarts.min.js "$E/echarts.js"
 cp consola.js "$E/consola.js"
-for d in "$E" "$U"; do cp ../bandeja/iconos/logo-claro.svg ../bandeja/iconos/logo-oscuro.svg "$d/"; done
-rm -f "$E/logo.svg" "$U/logo.svg" "$E/fuentes/geist.woff2" "$U/fuentes/geist.woff2"
+for d in "$E" "$U"; do cp ../bandeja/iconos/icono.png ../bandeja/iconos/mascota.png "$d/"; done
+rm -f "$E"/logo*.svg "$U"/logo*.svg "$E/fuentes/geist.woff2" "$U/fuentes/geist.woff2"
 du -sh "$E" "$U/estilo.css" | sed 's/^/  /'

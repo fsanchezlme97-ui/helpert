@@ -8,6 +8,7 @@ dependencies = [
     "uvicorn",
     "cryptography",
     "psycopg[binary]>=3.3.9",
+    "pillow>=13.0.0",
 ]
 
 [project.scripts]

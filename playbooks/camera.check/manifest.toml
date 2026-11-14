@@ -1,0 +1,10 @@
+id = "camera.check"
+version = "0.1.0"
+nombre = "Revisar la cámara"
+descripcion = "La cámara web no funciona, se ve negra en las videollamadas o el programa dice que no hay cámara. Revisa si el equipo detecta la cámara y qué programa la está usando, y dice qué hacer. Solo revisa: no cierra ni cambia nada."
+riesgo = "bajo"
+deshacer = false
+timeout = 30
+
+[sistemas]
+linux = "linux.sh"

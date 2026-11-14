@@ -1,0 +1,10 @@
+id = "time.sync"
+version = "0.1.0"
+nombre = "Corregir la hora del equipo"
+descripcion = "La hora o la fecha del equipo están mal, o las páginas seguras dan error de certificado o de reloj. Activa la hora automática por internet y la sincroniza. No cambia la zona horaria."
+riesgo = "bajo"
+deshacer = false
+timeout = 60
+
+[sistemas]
+linux = "linux.sh"
