@@ -9,6 +9,7 @@
 - icono.png: la marca chica sobre un cuadro blanco redondeado (favicon).
 - app/helpert-{n}.png: ese mismo icono dibujado en cada tamaño del tema (16 a 256 px), el que usan el menú de
   aplicaciones y las barras de tareas. Reducir el de 256 a 16 lo dejaba borroso.
+- icono.ico: esos mismos tamaños en un .ico, para el ejecutable de Windows.
 - logo.png / logo-oscuro.png: el logo con texto, para el README.
 
 Colores de estado de la paleta Oxocarbon (los mismos de la interfaz). Requiere ImageMagick 7 (`magick`).
@@ -68,6 +69,8 @@ if __name__ == "__main__":
         magick("-size", f"{n}x{n}", "xc:none", "-fill", "#FFFFFF", "-draw", f"roundrectangle 0,0 {n - 1},{n - 1} {radio},{radio}",
                "(", AQUI / "marca-chica.png", "-resize", f"{lado}x{lado}", ")", "-gravity", "center", "-composite",
                AQUI / "app" / f"helpert-{n}.png")
+    # el .ico de Windows (ejecutable y ventanas) con los mismos dibujos por tamaño
+    subprocess.run(["magick", *[AQUI / "app" / f"helpert-{n}.png" for n in (16, 24, 32, 48, 64, 256)], AQUI / "icono.ico"], check=True)
     magick(AQUI / "logo-texto-original.png", "-trim", "+repage", AQUI / "logo.png")
     magick(AQUI / "logo.png", *OSCURECER, AQUI / "logo-oscuro.png")
     for destino in (RAIZ / "bandeja" / "ui", RAIZ / "server" / "helpert_server" / "estatico"):

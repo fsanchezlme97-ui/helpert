@@ -4,8 +4,9 @@
 //! caja y, si la persona pulsa «Hazlo tú» en ese paso, se hace UNA acción de la lista cerrada en su centro. El chat
 //! nunca pasa coordenadas: la acción sale del último paso que mandó el servidor y se consume al usarla.
 //!
-//! shortcut: un solo monitor (el enfocado en Hyprland; en los demás escritorios, la captura completa con origen 0,0).
-//! Clic: Hyprland (hyprctl + ydotool) y X11 (xdotool); en GNOME/KDE Wayland la persona hace el clic. Windows después.
+//! shortcut: un solo monitor (el enfocado en Hyprland; en Windows, el principal; en los demás escritorios, la captura
+//! completa con origen 0,0). Clic: Hyprland (hyprctl + ydotool), X11 (xdotool) y Windows (SendInput); en GNOME/KDE
+//! Wayland la persona hace el clic.
 
 use base64::Engine;
 use serde_json::{json, Value};
@@ -36,10 +37,12 @@ pub fn centro(g: Geometria, caja: [f64; 4]) -> (i32, i32) {
     (((caja[0] + caja[2]) / 2.0 / g.escala + g.x).round() as i32, ((caja[1] + caja[3]) / 2.0 / g.escala + g.y).round() as i32)
 }
 
+#[cfg_attr(windows, allow(dead_code))]
 fn hyprland() -> bool {
     std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some()
 }
 
+#[cfg_attr(windows, allow(dead_code))]
 fn x11() -> bool {
     std::env::var_os("WAYLAND_DISPLAY").is_none() && std::env::var_os("DISPLAY").is_some()
 }
@@ -65,9 +68,19 @@ fn capturar_monitor(app: &AppHandle) -> Result<(Vec<u8>, Geometria), String> {
                             escala: m["scale"].as_f64().filter(|s| *s > 0.0).unwrap_or(1.0) };
         return Ok((datos, g));
     }
-    let datos = crate::tomar_captura()?;
+    let datos = crate::plataforma::tomar_captura()?;
+    // Windows: píxeles reales del monitor principal; Geometria en lógicos (origen / escala), como la ventana superpuesta
+    #[cfg(windows)]
+    let (x, y, escala) = {
+        let m = app.primary_monitor().ok().flatten().ok_or("No encontré el monitor")?;
+        let e = m.scale_factor();
+        (m.position().x as f64 / e, m.position().y as f64 / e, e)
+    };
+    #[cfg(not(windows))]
+    let (x, y) = (0.0, 0.0);
+    #[cfg(not(windows))]
     let escala = if x11() { 1.0 } else { app.primary_monitor().ok().flatten().map(|m| m.scale_factor()).unwrap_or(1.0) };
-    Ok((datos, Geometria { x: 0.0, y: 0.0, escala }))
+    Ok((datos, Geometria { x, y, escala }))
 }
 
 /// La ventana como capa de Wayland (gtk-layer-shell, si está instalada y el escritorio la soporta). Se carga en tiempo
@@ -137,7 +150,7 @@ fn ventana_guia(app: &AppHandle) -> Result<tauri::WebviewWindow, String> {
     #[cfg(not(target_os = "linux"))]
     let en_capa = false;
     if !en_capa {
-        // ventana normal del tamaño del escritorio (X11 y escritorios sin capas)
+        // ventana normal del tamaño del monitor (Windows, X11 y escritorios sin capas)
         if let Ok(Some(m)) = w.primary_monitor() {
             let _ = w.set_position(*m.position());
             let _ = w.set_size(*m.size());
@@ -223,6 +236,9 @@ pub async fn guia_actuar(app: AppHandle) -> Result<(), String> {
         }
         std::thread::sleep(Duration::from_millis(250));
         let (x, y) = centro(g, caja);
+        #[cfg(windows)]
+        let r = crate::plataforma::accionar(&accion, (x as f64 * g.escala).round() as i32, (y as f64 * g.escala).round() as i32);
+        #[cfg(not(windows))]
         let r = accionar(&accion, x, y);
         std::thread::sleep(Duration::from_millis(700)); // que la pantalla reaccione antes de la próxima captura
         if let Some(w) = &chat {
@@ -242,6 +258,7 @@ pub fn guia_cerrar(app: AppHandle) {
 }
 
 /// Los argumentos de cada herramienta: solo números y acciones de la lista cerrada, nunca texto.
+#[cfg_attr(windows, allow(dead_code))]
 pub fn ordenes(accion: &str, x: i32, y: i32, hypr: bool) -> Option<Vec<Vec<String>>> {
     let s = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
     let (xs, ys) = (x.to_string(), y.to_string());
@@ -268,6 +285,7 @@ pub fn ordenes(accion: &str, x: i32, y: i32, hypr: bool) -> Option<Vec<Vec<Strin
     Some(vec![[s(&["xdotool", "mousemove", &xs, &ys]), boton].concat()])
 }
 
+#[cfg(not(windows))]
 fn accionar(accion: &str, x: i32, y: i32) -> Result<(), String> {
     let hypr = hyprland();
     if !hypr && !x11() {
