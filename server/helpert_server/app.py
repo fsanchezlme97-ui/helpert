@@ -300,6 +300,13 @@ def crear_app(cfg: dict) -> FastAPI:
         externa = aj["capturas"]["ia_externa"] and ia_externa(c, caso["empresa_id"], caso["persona_id"])
         return ajustes.cadena_activa(aj, "vision", regla, externa=externa)
 
+    def cadena_guia(c, caso, eq, usuario):
+        """La cadena de visión si este equipo y usuario pueden pedir la guía en pantalla del caso; vacía si no."""
+        if (caso["equipo_id"] != eq["id"] or caso["usuario"] != usuario or caso["estado"] != "esperando_cierre"
+                or caso["playbook"] or caso["creado"] < db.ahora() - timedelta(days=1)):
+            return []
+        return cadena_pantalla(c, caso, eq["area"], ajustes.leer(c, cfg, caso["empresa_id"]))
+
     def trabajo(c, caso_id, paso, texto=""):
         caso = c.execute("SELECT k.*, q.area FROM casos k JOIN equipos q ON q.id = k.equipo_id WHERE k.id = %s",
                          (caso_id,)).fetchone()
@@ -342,10 +349,11 @@ def crear_app(cfg: dict) -> FastAPI:
             emp = per["empresa_id"]
             if m.caso_id is None:
                 # calificación obligatoria: antes de un caso nuevo, el anterior que espera cierre
-                pend = c.execute("SELECT id FROM casos WHERE persona_id = %s AND estado = 'esperando_cierre' ORDER BY id LIMIT 1",
+                pend = c.execute("SELECT * FROM casos WHERE persona_id = %s AND estado = 'esperando_cierre' ORDER BY id LIMIT 1",
                                  (per["id"],)).fetchone()
                 if pend:
                     return {"caso_id": pend["id"], "estado": "esperando_cierre", "cierre": True, "pendiente": True,
+                            "pantalla": bool(cadena_guia(c, pend, eq, m.usuario)),
                             "respuesta": f"Antes de abrir un caso nuevo, cuéntame cómo terminó tu caso #{pend['id']}."}
                 caso = c.execute("INSERT INTO casos (equipo_id, usuario, so, estado, empresa_id, persona_id) "
                                  "VALUES (%s, %s, %s, 'conversando', %s, %s) RETURNING *",
@@ -465,10 +473,8 @@ def crear_app(cfg: dict) -> FastAPI:
         recibió una guía escrita; la imagen no se guarda, solo el paso que se dio queda en la conversación."""
         with db.conexion(ruta) as c:
             caso = caso_de(c, eq["id"], k.caso_id, k.usuario)
-            aj = ajustes.leer(c, cfg, caso["empresa_id"])
-            cadena = cadena_pantalla(c, caso, eq["area"], aj)
-            if (caso["estado"] != "esperando_cierre" or caso["playbook"] or not cadena
-                    or caso["creado"] < db.ahora() - timedelta(days=1)):
+            cadena = cadena_guia(c, caso, eq, k.usuario)
+            if not cadena:
                 raise HTTPException(409, "La guía en pantalla no está disponible para este caso")
             # cada llamada cuenta, también las que fallan: el tope limita el costo del caso, no solo los pasos dados
             if caso["pantalla_intentos"] >= 2 * pantalla.MAX_PASOS:

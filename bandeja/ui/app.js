@@ -91,7 +91,7 @@ async function enviar(pet) {
              ["No", () => enviar({ tipo: "confirmar", caso_id: caso, acepta: false })]],
             "Helpert necesita tu permiso para hacer este cambio.");
   } else if (r.cierre) {
-    pedirCierre();
+    pedirCierre(r.pantalla);
   } else if (evidencia) {
     // Plan, paso 3: la captura se pide en el momento, con permiso, y la persona la ve antes de enviarla.
     botones([["Sí, tomar captura", () => tomarCaptura(evidencia), "primario"],
@@ -103,14 +103,60 @@ async function enviar(pet) {
 }
 
 // La calificación es obligatoria: sin ella no se abre un caso nuevo.
-function pedirCierre() {
+function pedirCierre(pantalla) {
   const calificar = (resuelto) => {
     burbuja("helpert", "¿Cómo calificas la atención?");
     const nota = (n) => async () => { await enviar({ tipo: "cierre", caso_id: caso, resuelto, calificacion: n }); estado(); };
     botones([["1", nota(1)], ["2", nota(2)], ["3", nota(3)], ["4", nota(4)], ["5", nota(5)]], "1 = mala · 5 = excelente");
   };
-  botones([["Sí, se resolvió", () => calificar(true), "primario"], ["No", () => calificar(false)]],
-          "¿Se resolvió tu problema?");
+  const lista = [["Sí, se resolvió", () => calificar(true), "primario"], ["No", () => calificar(false)]];
+  if (pantalla) lista.push(["Guíame en pantalla", () => guiar("inicio")]);
+  botones(lista, pantalla ? "¿Se resolvió tu problema? También puedo señalarte cada paso en tu pantalla." : "¿Se resolvió tu problema?");
+}
+
+// Guía en pantalla: Helpert mira la pantalla (sin sus ventanas), resalta el siguiente elemento y mueve un cursor fantasma.
+// La persona hace el paso o, con «Hazlo tú», permite UNA acción sobre ese elemento. Nada se envía sin pedirlo aquí.
+const VERBO = { clic: "clic", doble_clic: "doble clic", desplazar_abajo: "bajar", desplazar_arriba: "subir" };
+async function guiar(hecho) {
+  botones([]);
+  ocupado(true);
+  const espera = escribiendo();
+  let r;
+  try {
+    r = await invoke("guia_paso", { casoId: caso, hecho });
+  } catch (err) {
+    r = { error: String(err) };
+  }
+  espera.remove();
+  ocupado(false);
+  const terminar = () => { invoke("guia_cerrar").catch(() => {}); pedirCierre(); };
+  if (r.error) { burbuja("error", r.error); invoke("guia_cerrar").catch(() => {}); return pedirCierre(true); }  // se puede reintentar
+  if (!r.paso) {  // p. ej. el paso necesitaba a soporte y el caso se escaló
+    invoke("guia_cerrar").catch(() => {});
+    if (r.respuesta) burbuja("helpert", r.respuesta);
+    return botones([]);
+  }
+  const p = r.paso;
+  burbuja("helpert", `Paso ${p.n}: ${p.instruccion}`);
+  if (p.terminado) return terminar();
+  const lista = [["Ya lo hice", () => guiar("persona"), "primario"]];
+  if (p.caja && VERBO[p.accion]) lista.push([`Hazlo tú: ${VERBO[p.accion]} en «${p.etiqueta}»`, () => hazlo()]);
+  lista.push(["Terminar guía", terminar]);
+  botones(lista, p.caja ? "Te lo marqué en la pantalla con un recuadro." : "");
+}
+
+async function hazlo() {
+  botones([]);
+  ocupado(true);
+  try {
+    await invoke("guia_actuar");
+  } catch (err) {
+    ocupado(false);
+    burbuja("error", String(err));
+    return botones([["Ya lo hice", () => guiar("persona"), "primario"], ["Terminar guía", () => { invoke("guia_cerrar"); pedirCierre(); }]]);
+  }
+  ocupado(false);
+  guiar("helpert");
 }
 
 async function tomarCaptura(cid) {

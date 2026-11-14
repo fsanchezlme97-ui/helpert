@@ -146,7 +146,8 @@ def ver(cadena: list[dict], texto: str, b64: str, esquema: dict, modelo):
             continue
         nombre = f"{cfg['proveedor']}:{cfg['modelo']}"
         try:
-            r = llamar({**cfg, "esquema": esquema}, _mensajes(cfg, texto, b64))
+            extra = {"razonamiento": "minimal"} if cfg["proveedor"] == "gemini" else {}  # con "low" tarda más de 40 s por imagen
+            r = llamar({**cfg, "esquema": esquema, **extra}, _mensajes(cfg, texto, b64))
         except ia.ErrorProveedor as e:
             errores.append(f"{nombre}: {e}")
             continue

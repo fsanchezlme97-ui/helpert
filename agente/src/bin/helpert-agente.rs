@@ -222,6 +222,13 @@ impl Agente {
                 }
                 ("/v1/captura", json!({"caso_id": pet["caso_id"], "acepta": pet["acepta"], "imagen": pet["imagen"], "usuario": usuario}))
             }
+            Some("pantalla") => {
+                // guía en pantalla: la captura va al servidor, que elige el paso; aquí no se ejecuta nada
+                if pet["imagen"].as_str().map_or(0, str::len) > 12_000_000 {
+                    return json!({"error": "La captura es demasiado grande"});
+                }
+                ("/v1/pantalla", json!({"caso_id": pet["caso_id"], "imagen": pet["imagen"], "hecho": pet["hecho"], "usuario": usuario}))
+            }
             Some("avisos") => {
                 // la bandeja pregunta cada 30 s; con ella abierta, el latido se adelanta para que el aviso llegue en ~1 min
                 let viejo = self.ultimo_latido.lock().unwrap().is_none_or(|t| t.elapsed() > Duration::from_secs(60));

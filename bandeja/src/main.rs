@@ -4,6 +4,8 @@
 //! Estados del icono (logo y estados helpert.jpg): disponible, pensando (esperando al servidor o a la IA),
 //! trabajando (el servicio corre un paso de playbook) y aviso (respuesta sin leer o error).
 
+mod guia;
+
 use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::io::{BufRead, BufReader, Write};
@@ -228,7 +230,9 @@ fn main() {
     tauri::Builder::default()
         .manage(Actual(Mutex::new(Estado::Disponible)))
         .manage(Notificados(Mutex::new(HashSet::new())))
-        .invoke_handler(tauri::generate_handler![enviar, consultar, capturar, abrir_remoto, abrir])
+        .manage(guia::Ultimo(Mutex::new(None)))
+        .invoke_handler(tauri::generate_handler![enviar, consultar, capturar, abrir_remoto, abrir,
+                                                 guia::guia_paso, guia::guia_actuar, guia::guia_cerrar])
         .setup(|app| {
             let menu = Menu::with_items(app, &[
                 &MenuItem::with_id(app, "abrir", "Abrir Helpert", true, None::<&str>)?,

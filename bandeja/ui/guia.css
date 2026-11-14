@@ -1,0 +1,24 @@
+/* Capa de la guía en pantalla. Colores de la paleta Oxocarbon (los de tema.css), sin depender de Tailwind. */
+@font-face { font-family: Inter; src: url("fuentes/inter.woff2") format("woff2"); font-weight: 100 900; }
+:root { --primario: #0F62FE; --tarjeta: #FFFFFF; --texto: #161616; --borde: #DDE1E6; }
+@media (prefers-color-scheme: dark) { :root { --primario: #78A9FF; --tarjeta: #161616; --texto: #F2F4F8; --borde: #393939; } }
+html, body { margin: 0; width: 100%; height: 100%; background: transparent; overflow: hidden; pointer-events: none;
+  font-family: Inter, system-ui, sans-serif; }
+[hidden] { display: none !important; }
+/* El foco: el elemento queda claro y el resto de la pantalla, un poco más oscuro. */
+#marco { position: fixed; border: 3px solid var(--primario); border-radius: 10px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primario) 30%, transparent), 0 0 0 100vmax rgb(0 0 0 / 0.28);
+  transition: left .5s ease, top .5s ease, width .5s ease, height .5s ease; animation: latido 1.6s ease-in-out infinite; }
+@keyframes latido { 50% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--primario) 18%, transparent), 0 0 0 100vmax rgb(0 0 0 / 0.28); } }
+#numero { position: absolute; top: -14px; left: -14px; min-width: 26px; height: 26px; padding: 0 6px; box-sizing: border-box;
+  border-radius: 13px; background: var(--primario); color: #fff; font: 600 14px/26px Inter, sans-serif; text-align: center; }
+/* Cursor fantasma: viaja hasta el elemento; el real no se mueve hasta que la persona pide «Hazlo tú». */
+#cursor { position: fixed; left: 0; top: 0; width: 34px; height: 34px; fill: color-mix(in srgb, var(--primario) 80%, transparent);
+  stroke: #fff; stroke-width: 1.6; stroke-linejoin: round; filter: drop-shadow(0 2px 4px rgb(0 0 0 / .45));
+  transition: transform .9s cubic-bezier(.3, .7, .2, 1); }
+#burbuja { position: fixed; display: flex; gap: 10px; align-items: flex-start; max-width: 340px; padding: 10px 14px;
+  border: 1px solid var(--borde); border-radius: 14px; background: var(--tarjeta); color: var(--texto);
+  box-shadow: 0 8px 24px rgb(0 0 0 / .25); font-size: 15px; line-height: 1.4; }
+#burbuja img { width: 28px; height: 28px; flex: none; }
+#burbuja p { margin: 0; }
+@media (prefers-reduced-motion: reduce) { #marco, #cursor { transition: none; animation: none; } }

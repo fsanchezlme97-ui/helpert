@@ -89,6 +89,8 @@ def test_solo_con_capturas_y_en_su_caso(servidor, falso):
     assert pedir(api, r["caso_id"], imagen=base64.b64encode(b"<svg/>").decode()).status_code == 422
     falso["b"] += ["no es json", "tampoco"]  # el modelo no responde con el formato: sigue con la guía escrita
     assert "error" in pedir(api, r["caso_id"]).json()
+    p = enviar(api, "otra cosa")  # al volver, el caso pendiente sigue ofreciendo la guía
+    assert p["pendiente"] and p["caso_id"] == r["caso_id"] and p["pantalla"]
 
 
 def test_marcas_numeradas():

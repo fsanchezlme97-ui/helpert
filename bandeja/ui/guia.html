@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<title>Helpert guía</title>
+<link rel="stylesheet" href="guia.css">
+</head>
+<body>
+<!-- Capa transparente sobre la pantalla: no recibe clics (la bandeja la hace atravesable). -->
+<div id="marco" hidden><span id="numero"></span></div>
+<div id="burbuja" role="status" hidden><img src="icono.png" alt=""><p id="texto"></p></div>
+<svg id="cursor" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M4 3l7.5 18 2.6-7.6L21.6 11z"/></svg>
+<script src="guia.js"></script>
+</body>
+</html>

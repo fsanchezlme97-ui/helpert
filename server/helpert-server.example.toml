@@ -11,17 +11,17 @@ umbral_confianza = 0.7
 zona_horaria = "America/Lima"
 
 # Cadena de IA, en orden. Si ninguno responde, Helpert ofrece el menú sin IA.
-# Principal: una API en la nube con formato OpenAI. La clave va en la variable de entorno, nunca aquí.
+# Principal: Gemini (API de Google). La clave va en la variable de entorno, nunca aquí.
+# La capa gratuita sirve para probar: cupos diarios bajos y Google puede usar los datos; en producción, una clave de pago.
 [[ia]]
-proveedor = "openai-compatible"
-modelo = "gpt-4o-mini"
-url = "https://api.openai.com/v1"
+proveedor = "gemini"
+modelo = "gemini-3.5-flash-lite"
 clave_env = "HELPERT_IA_CLAVE"
-timeout = 30
-# Mismo adaptador, otros proveedores (sin probar aún):
-#   Gemini:    url = "https://generativelanguage.googleapis.com/v1beta/openai"
-#   Anthropic: url = "https://api.anthropic.com/v1"
-#   OpenRouter, Groq, DeepSeek, Mistral: su URL /v1
+timeout = 40
+tareas = ["conversar", "complejo", "vision"]  # vision: capturas y guía en pantalla
+
+# Otra API con formato OpenAI (sin probar aún): proveedor = "openai-compatible" y su url, p. ej.
+#   OpenAI: https://api.openai.com/v1 · Anthropic: https://api.anthropic.com/v1 · OpenRouter, Groq, DeepSeek, Mistral: su URL /v1
 
 # Respaldo: Ollama. En una VPS sin GPU será lento; mídelo antes de confiar en él.
 [[ia]]

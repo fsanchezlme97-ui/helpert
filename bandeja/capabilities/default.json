@@ -1,6 +1,6 @@
 {
   "identifier": "default",
-  "description": "La ventana de chat solo llama a los comandos propios de la bandeja.",
-  "windows": ["chat"],
+  "description": "El chat y la capa de la guía en pantalla (que solo escucha el evento «guia») usan los comandos propios de la bandeja.",
+  "windows": ["chat", "guia"],
   "permissions": ["core:default"]
 }
