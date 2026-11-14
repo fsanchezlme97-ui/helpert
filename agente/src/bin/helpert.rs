@@ -3,11 +3,10 @@
 
 use serde_json::{json, Value};
 use std::io::{self, BufRead, BufReader, Write};
-use std::os::unix::net::UnixStream;
 
 fn enviar(socket: &str, pet: Value) -> Value {
     let r = (|| -> io::Result<Value> {
-        let s = UnixStream::connect(socket)?;
+        let s = agente::canal::conectar(socket)?;
         writeln!(&s, "{pet}")?;
         for linea in BufReader::new(&s).lines() {
             let v: Value = serde_json::from_str(&linea?).unwrap_or(json!({"error": "Respuesta no válida del agente"}));
@@ -60,7 +59,7 @@ fn entrar(socket: &str) -> bool {
 }
 
 fn main() {
-    let socket = std::env::var("HELPERT_SOCKET").unwrap_or_else(|_| "/run/helpert/agente.sock".into());
+    let socket = agente::canal::ruta();
     if !entrar(&socket) {
         return;
     }

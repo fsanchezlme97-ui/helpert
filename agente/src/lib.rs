@@ -15,6 +15,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
+pub mod canal;
+
 pub const FIRMA: &str = "firma.ed25519";
 
 /// El token del equipo solo viaja cifrado: https siempre, salvo un servidor en este mismo equipo (desarrollo).
@@ -102,7 +104,9 @@ fn leer_archivos(raiz: &Path, dir: &Path, out: &mut BTreeMap<String, Vec<u8>>) -
         } else if tipo.is_dir() {
             leer_archivos(raiz, &ruta, out)?;
         } else if tipo.is_file() {
-            let rel = ruta.strip_prefix(raiz).unwrap().to_str().ok_or("ruta no UTF-8")?.to_string();
+            // con «/» en todos los sistemas, como firma el servidor (as_posix)
+            let partes: Option<Vec<&str>> = ruta.strip_prefix(raiz).unwrap().components().map(|c| c.as_os_str().to_str()).collect();
+            let rel = partes.ok_or("ruta no UTF-8")?.join("/");
             out.insert(rel, fs::read(&ruta).map_err(|e| e.to_string())?);
         } else {
             return Err(format!("{}: tipo de archivo no permitido", ruta.display()));
@@ -233,6 +237,9 @@ pub fn ejecutar(p: &Paquete, so: &str, paso: &str, env: &[(String, String)], usu
     if !PASOS.contains(&paso) {
         return falla(format!("paso no válido: {paso}"));
     }
+    if so != std::env::consts::OS {
+        return falla(format!("este equipo no es {so}"));
+    }
     let Some(script) = p.manifiesto.sistemas.get(so).and_then(|f| p.archivos.get(f)) else {
         return falla(format!("{} no tiene script para {so}", p.manifiesto.id));
     };
@@ -240,36 +247,33 @@ pub fn ejecutar(p: &Paquete, so: &str, paso: &str, env: &[(String, String)], usu
     if script.contains('\0') {
         return falla("script con bytes nulos".into());
     }
-    use std::os::unix::process::CommandExt;
-    let mut cmd = Command::new("/bin/bash");
-    cmd.arg("-c").arg(script).arg(format!("helpert-{}", p.manifiesto.id)).arg(paso)
-        .env_clear()
-        .env("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
-        .env("LANG", "C.UTF-8")
-        .env("HP_PASO", paso)
+    if cfg!(windows) && script.chars().count() > 10_000 {
+        return falla("script de más de 10 000 caracteres: no cabe en la línea de comandos de Windows".into());
+    }
+    let mut cmd = comando(script, &p.manifiesto.id, paso);
+    cmd.env("HP_PASO", paso)
         .env("HP_USUARIO", usuario)
         .envs(env.iter().map(|(k, v)| (k, v)))
-        .current_dir("/")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .process_group(0); // para poder matar también a los hijos si se pasa del tiempo
+        .stderr(Stdio::piped());
     let mut hijo = match cmd.spawn() {
         Ok(h) => h,
         Err(e) => return falla(e.to_string()),
     };
+    let grupo = Grupo::de(&hijo);
     let out = leer_hilo(hijo.stdout.take().unwrap());
     let err = leer_hilo(hijo.stderr.take().unwrap());
     let limite = Instant::now() + Duration::from_secs(p.manifiesto.timeout);
     let codigo = loop {
         match hijo.try_wait() {
             Ok(Some(st)) => {
-                unsafe { libc::kill(-(hijo.id() as i32), libc::SIGKILL) }; // procesos sueltos que dejó el script
+                grupo.matar(); // procesos sueltos que dejó el script
                 break st.code().unwrap_or(-1);
             }
             Ok(None) if Instant::now() < limite => std::thread::sleep(Duration::from_millis(100)),
             _ => {
-                unsafe { libc::kill(-(hijo.id() as i32), libc::SIGKILL) };
+                grupo.matar();
                 let _ = hijo.wait();
                 break 124;
             }
@@ -280,4 +284,111 @@ pub fn ejecutar(p: &Paquete, so: &str, paso: &str, env: &[(String, String)], usu
         error.push_str("\nSe pasó del tiempo límite.");
     }
     Salida { codigo, salida: out.join().unwrap_or_default(), error }
+}
+
+/// Linux: bash con el script como argumento, PATH fijo y su propio grupo de procesos.
+#[cfg(unix)]
+fn comando(script: &str, id: &str, paso: &str) -> Command {
+    use std::os::unix::process::CommandExt;
+    let mut cmd = Command::new("/bin/bash");
+    cmd.arg("-c").arg(script).arg(format!("helpert-{id}")).arg(paso)
+        .env_clear()
+        .env("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
+        .env("LANG", "C.UTF-8")
+        .current_dir("/")
+        .process_group(0); // para poder matar también a los hijos si se pasa del tiempo
+    cmd
+}
+
+/// Windows: PowerShell 5.1 con el script en -EncodedCommand (los bytes verificados, sin archivo que se pueda
+/// cambiar en medio) y salida en UTF-8. El paso va en HP_PASO. Del entorno del servicio solo pasa lo que
+/// PowerShell y los comandos del sistema necesitan.
+#[cfg(windows)]
+fn comando(script: &str, _id: &str, _paso: &str) -> Command {
+    use std::os::windows::process::CommandExt;
+    let raiz = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
+    let fuente = format!("$ProgressPreference = 'SilentlyContinue'\n[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false\n$OutputEncoding = [Console]::OutputEncoding\n{script}");
+    let utf16: Vec<u8> = fuente.encode_utf16().flat_map(u16::to_le_bytes).collect();
+    let mut cmd = Command::new(format!(r"{raiz}\System32\WindowsPowerShell\v1.0\powershell.exe"));
+    cmd.args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", &base64(&utf16)])
+        .env_clear()
+        .envs(["SystemRoot", "windir", "SystemDrive", "ProgramData", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432",
+               "CommonProgramFiles", "CommonProgramFiles(x86)", "COMPUTERNAME", "PATHEXT", "NUMBER_OF_PROCESSORS",
+               "PROCESSOR_ARCHITECTURE", "OS", "ALLUSERSPROFILE", "PUBLIC"]
+            .into_iter().filter_map(|k| std::env::var(k).ok().map(|v| (k, v))))
+        .env("PATH", format!(r"{raiz}\System32;{raiz};{raiz}\System32\Wbem;{raiz}\System32\WindowsPowerShell\v1.0\"))
+        .env("TEMP", format!(r"{raiz}\Temp"))
+        .env("TMP", format!(r"{raiz}\Temp"))
+        .current_dir(&raiz)
+        .creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    cmd
+}
+
+/// Base64 estándar (para -EncodedCommand).
+#[cfg(any(windows, test))]
+fn base64(datos: &[u8]) -> String {
+    const A: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut s = String::with_capacity(datos.len().div_ceil(3) * 4);
+    for c in datos.chunks(3) {
+        let n = (c[0] as u32) << 16 | (*c.get(1).unwrap_or(&0) as u32) << 8 | *c.get(2).unwrap_or(&0) as u32;
+        for i in 0..4 {
+            s.push(if i <= c.len() { A[(n >> (18 - 6 * i) & 63) as usize] as char } else { '=' });
+        }
+    }
+    s
+}
+
+/// El proceso del script y todo lo que lance, para terminarlo junto.
+#[cfg(unix)]
+struct Grupo(i32);
+
+#[cfg(unix)]
+impl Grupo {
+    fn de(hijo: &std::process::Child) -> Self {
+        Grupo(hijo.id() as i32)
+    }
+    fn matar(&self) {
+        unsafe { libc::kill(-self.0, libc::SIGKILL) };
+    }
+}
+
+/// Windows: un Job object que termina a todos sus procesos al cerrarse.
+#[cfg(windows)]
+struct Grupo(windows_sys::Win32::Foundation::HANDLE);
+
+#[cfg(windows)]
+impl Grupo {
+    fn de(hijo: &std::process::Child) -> Self {
+        use std::os::windows::io::AsRawHandle;
+        use windows_sys::Win32::System::JobObjects::*;
+        unsafe {
+            let job = CreateJobObjectW(std::ptr::null(), std::ptr::null());
+            let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
+            info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+            SetInformationJobObject(job, JobObjectExtendedLimitInformation, &info as *const _ as _,
+                                    std::mem::size_of_val(&info) as u32);
+            AssignProcessToJobObject(job, hijo.as_raw_handle() as _);
+            Grupo(job)
+        }
+    }
+    fn matar(&self) {
+        unsafe { windows_sys::Win32::System::JobObjects::TerminateJobObject(self.0, 124) };
+    }
+}
+
+#[cfg(windows)]
+impl Drop for Grupo {
+    fn drop(&mut self) {
+        unsafe { windows_sys::Win32::Foundation::CloseHandle(self.0) };
+    }
+}
+
+#[cfg(test)]
+mod pruebas {
+    #[test]
+    fn base64_como_el_estandar() {
+        for (entrada, salida) in [("", ""), ("f", "Zg=="), ("fo", "Zm8="), ("foo", "Zm9v"), ("foob", "Zm9vYg=="), ("fooba", "Zm9vYmE=")] {
+            assert_eq!(super::base64(entrada.as_bytes()), salida);
+        }
+    }
 }

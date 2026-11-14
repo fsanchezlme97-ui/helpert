@@ -3,15 +3,13 @@
 //!
 //! shortcut: token por equipo sobre HTTP; antes del piloto, TLS mutuo con certificado por equipo (ver el plan).
 
-use agente::{cargar, ejecutar, huella, leer_clave, servidor_seguro, validar, verificar_actualizacion};
+use agente::canal::Conexion;
+use agente::{cargar, canal, ejecutar, huella, leer_clave, servidor_seguro, validar, verificar_actualizacion};
 use ed25519_dalek::VerifyingKey;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::io::{BufRead, BufReader, Write};
-use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-use std::os::unix::io::AsRawFd;
-use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -28,7 +26,7 @@ struct Config {
 }
 
 fn socket_defecto() -> PathBuf {
-    "/run/helpert/agente.sock".into()
+    canal::RUTA.into()
 }
 
 struct Agente {
@@ -46,8 +44,12 @@ struct Agente {
 
 /// ID de RustDesk o AnyDesk de este equipo, si alguno está instalado (programa con `--get-id`, máximo 5 s).
 fn id_remoto() -> String {
-    for prog in ["rustdesk", "anydesk"] {
-        let Ok(mut hijo) = std::process::Command::new(prog).arg("--get-id").stdout(std::process::Stdio::piped())
+    #[cfg(unix)]
+    let programas = [("rustdesk", "rustdesk"), ("anydesk", "anydesk")];
+    #[cfg(windows)]
+    let programas = [("rustdesk", r"C:\Program Files\RustDesk\rustdesk.exe"), ("anydesk", r"C:\Program Files (x86)\AnyDesk\AnyDesk.exe")];
+    for (prog, ruta) in programas {
+        let Ok(mut hijo) = std::process::Command::new(ruta).arg("--get-id").stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::null()).spawn() else { continue };
         let inicio = Instant::now();
         while matches!(hijo.try_wait(), Ok(None)) && inicio.elapsed() < Duration::from_secs(5) {
@@ -131,8 +133,8 @@ impl Agente {
         }
     }
 
-    /// Reemplaza este ejecutable por una versión firmada y sale con código 75: systemd lo vuelve a arrancar
-    /// (Restart=on-failure). Antes prueba el binario nuevo: uno que no arranca nunca reemplaza al que funciona.
+    /// Reemplaza este ejecutable por una versión firmada y sale con código 75: systemd (Restart=on-failure) o el
+    /// administrador de servicios de Windows (acciones de recuperación) lo vuelve a arrancar. Antes prueba el binario nuevo: uno que no arranca nunca reemplaza al que funciona.
     fn actualizar(&self, a: &Value) -> Result<(), String> {
         let campo = |k: &str| a[k].as_str().ok_or(format!("falta {k}"));
         let (version, so, sha, firma, ruta) = (campo("version")?, campo("so")?, campo("sha256")?, campo("firma")?, campo("ruta")?);
@@ -147,10 +149,13 @@ impl Agente {
         if let Err(e) = verificar_actualizacion(&datos, version, so, sha, firma, &self.clave) {
             return fallar(e);
         }
-        let nuevo = self.exe.with_extension("nuevo");
+        let nuevo = self.exe.with_extension(if cfg!(windows) { "nuevo.exe" } else { "nuevo" });
         let _ = std::fs::remove_file(&nuevo);
-        let escrito = std::fs::OpenOptions::new().write(true).create_new(true).mode(0o755).open(&nuevo)
-            .and_then(|mut f| f.write_all(&datos).and_then(|_| f.sync_all()));
+        let mut opciones = std::fs::OpenOptions::new();
+        opciones.write(true).create_new(true);
+        #[cfg(unix)]
+        std::os::unix::fs::OpenOptionsExt::mode(&mut opciones, 0o755);
+        let escrito = opciones.open(&nuevo).and_then(|mut f| f.write_all(&datos).and_then(|_| f.sync_all()));
         if let Err(e) = escrito {
             return Err(format!("{}: {e}", nuevo.display()));
         }
@@ -183,13 +188,13 @@ impl Agente {
                 return fallar(format!("el binario nuevo no pasó la prueba: {e}"));
             }
         }
-        std::fs::rename(&nuevo, &self.exe).map_err(|e| format!("{}: {e}", self.exe.display()))?;
+        reemplazar(&nuevo, &self.exe).map_err(|e| format!("{}: {e}", self.exe.display()))?;
         let espera = Instant::now();
         while self.ocupado.load(Ordering::SeqCst) > 0 && espera.elapsed() < Duration::from_secs(600) {
             std::thread::sleep(Duration::from_secs(1)); // no se corta una conversación a la mitad
         }
         eprintln!("[agente] actualizado a {version}; reinicio");
-        std::process::exit(75);
+        salir(75);
     }
 
     fn correr(&self, t: &Value, usuario: &str) -> Value {
@@ -284,8 +289,34 @@ impl Agente {
     }
 }
 
+/// Pone el binario nuevo en lugar del que corre. Windows no deja sobrescribir un ejecutable en uso, pero sí
+/// renombrarlo: el viejo queda como `.viejo.exe` y se borra al arrancar la versión nueva.
+#[cfg(unix)]
+fn reemplazar(nuevo: &std::path::Path, exe: &std::path::Path) -> std::io::Result<()> {
+    std::fs::rename(nuevo, exe)
+}
+
+#[cfg(windows)]
+fn reemplazar(nuevo: &std::path::Path, exe: &std::path::Path) -> std::io::Result<()> {
+    let viejo = exe.with_extension("viejo.exe");
+    let _ = std::fs::remove_file(&viejo);
+    std::fs::rename(exe, &viejo)?;
+    std::fs::rename(nuevo, exe).inspect_err(|_| {
+        let _ = std::fs::rename(&viejo, exe);
+    })
+}
+
+/// Sale del proceso; como servicio de Windows, avisa antes el código al administrador de servicios.
+fn salir(codigo: i32) -> ! {
+    #[cfg(windows)]
+    servicio::detenido(codigo);
+    std::process::exit(codigo)
+}
+
 /// Usuario de quien se conecta, según el núcleo (SO_PEERCRED), no según lo que diga el cliente.
-fn usuario_de(s: &UnixStream) -> Option<String> {
+#[cfg(unix)]
+fn usuario_de(s: &Conexion) -> Option<String> {
+    use std::os::unix::io::AsRawFd;
     let mut cred = libc::ucred { pid: 0, uid: 0, gid: 0 };
     let mut largo = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
     let ok = unsafe {
@@ -298,14 +329,153 @@ fn usuario_de(s: &UnixStream) -> Option<String> {
     Some(String::from_utf8_lossy(&out.stdout).trim().to_string()).filter(|u| !u.is_empty())
 }
 
+/// Windows: la cuenta de quien abrió la tubería (`DOMINIO\usuario`), tomando su identidad un momento
+/// (ImpersonateNamedPipeClient), no lo que diga el cliente. Se llama después de leer su petición.
+#[cfg(windows)]
+fn usuario_de(s: &Conexion) -> Option<String> {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
+    use windows_sys::Win32::Security::*;
+    use windows_sys::Win32::System::Pipes::ImpersonateNamedPipeClient;
+    use windows_sys::Win32::System::Threading::{GetCurrentThread, OpenThreadToken};
+    unsafe {
+        if ImpersonateNamedPipeClient(s.as_raw_handle() as HANDLE) == 0 {
+            return None;
+        }
+        let mut token: HANDLE = std::ptr::null_mut();
+        let abierto = OpenThreadToken(GetCurrentThread(), TOKEN_QUERY, 1, &mut token);
+        RevertToSelf();
+        if abierto == 0 {
+            return None;
+        }
+        let mut buf = vec![0u8; 256];
+        let mut largo = 0u32;
+        let ok = GetTokenInformation(token, TokenUser, buf.as_mut_ptr() as _, buf.len() as u32, &mut largo);
+        CloseHandle(token);
+        if ok == 0 {
+            return None;
+        }
+        let sid = (*(buf.as_ptr() as *const TOKEN_USER)).User.Sid;
+        let (mut nombre, mut dominio) = ([0u16; 256], [0u16; 256]);
+        let (mut ln, mut ld, mut uso) = (256u32, 256u32, 0);
+        if LookupAccountSidW(std::ptr::null(), sid, nombre.as_mut_ptr(), &mut ln, dominio.as_mut_ptr(), &mut ld, &mut uso) == 0 {
+            return None;
+        }
+        let texto = |b: &[u16], n: u32| String::from_utf16_lossy(&b[..n as usize]);
+        Some(format!("{}\\{}", texto(&dominio, ld), texto(&nombre, ln)))
+    }
+}
+
+/// Atiende una conexión del chat: lee una petición y responde con una línea (más líneas de progreso).
+fn conversar(agente: &Agente, con: Conexion) {
+    let mut linea = String::new();
+    if BufReader::new(&con).read_line(&mut linea).is_err() {
+        return;
+    }
+    let Some(usuario) = usuario_de(&con) else { return };
+    agente.ocupado.fetch_add(1, Ordering::SeqCst);
+    let resp = match serde_json::from_str::<Value>(&linea) {
+        Ok(pet) => agente.atender(&pet, &usuario, &mut || {
+            let _ = writeln!(&con, r#"{{"progreso":"trabajando"}}"#);
+        }),
+        Err(_) => json!({"error": "JSON no válido"}),
+    };
+    agente.ocupado.fetch_sub(1, Ordering::SeqCst);
+    let _ = writeln!(&con, "{resp}");
+}
+
+/// Linux: socket en /run/helpert. Cualquier usuario del equipo puede pedir ayuda; quién es lo dice el núcleo,
+/// y qué se ejecuta lo decide el servidor.
+#[cfg(unix)]
+fn escuchar(ruta: &std::path::Path, atender: impl Fn(Conexion) + Send + Sync + 'static) {
+    use std::os::unix::fs::PermissionsExt;
+    if let Some(dir) = ruta.parent() {
+        std::fs::create_dir_all(dir).expect("carpeta del socket");
+    }
+    let _ = std::fs::remove_file(ruta);
+    let escucha = std::os::unix::net::UnixListener::bind(ruta).expect("no pude abrir el socket");
+    std::fs::set_permissions(ruta, std::fs::Permissions::from_mode(0o666)).expect("permisos del socket");
+    let atender = Arc::new(atender);
+    for con in escucha.incoming().flatten() {
+        let atender = atender.clone();
+        std::thread::spawn(move || atender(con));
+    }
+}
+
+/// Windows: tubería con nombre, de SYSTEM, que los usuarios del equipo pueden leer y escribir pero no crear
+/// (FILE_FLAG_FIRST_PIPE_INSTANCE: si alguien la creó antes, el servicio no arranca en vez de compartirla),
+/// solo local.
+#[cfg(windows)]
+fn escuchar(ruta: &std::path::Path, atender: impl Fn(Conexion) + Send + Sync + 'static) {
+    use std::os::windows::io::FromRawHandle;
+    use windows_sys::Win32::Foundation::*;
+    use windows_sys::Win32::Security::Authorization::{ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1};
+    use windows_sys::Win32::Security::SECURITY_ATTRIBUTES;
+    use windows_sys::Win32::Storage::FileSystem::{FILE_FLAG_FIRST_PIPE_INSTANCE, PIPE_ACCESS_DUPLEX};
+    use windows_sys::Win32::System::Pipes::*;
+    let ancho = |t: &str| t.encode_utf16().chain([0]).collect::<Vec<u16>>();
+    let nombre = ancho(ruta.to_str().expect("ruta de la tubería"));
+    // dueño SYSTEM (el cliente lo comprueba); SYSTEM todo; usuarios autenticados: leer y escribir datos (0x12008b),
+    // sin FILE_CREATE_PIPE_INSTANCE
+    let sddl = ancho("O:SYG:SYD:P(A;;GA;;;SY)(A;;0x12008b;;;AU)");
+    let mut sd = std::ptr::null_mut();
+    let ok = unsafe { ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.as_ptr(), SDDL_REVISION_1, &mut sd, std::ptr::null_mut()) };
+    assert!(ok != 0, "descriptor de seguridad de la tubería");
+    let sa = SECURITY_ATTRIBUTES { nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32, lpSecurityDescriptor: sd, bInheritHandle: 0 };
+    let atender = Arc::new(atender);
+    let mut primera = true;
+    loop {
+        let modo = PIPE_ACCESS_DUPLEX | if primera { FILE_FLAG_FIRST_PIPE_INSTANCE } else { 0 };
+        let h = unsafe {
+            CreateNamedPipeW(nombre.as_ptr(), modo, PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
+                             PIPE_UNLIMITED_INSTANCES, 65536, 65536, 0, &sa)
+        };
+        if h == INVALID_HANDLE_VALUE {
+            let e = std::io::Error::last_os_error();
+            if primera {
+                panic!("no pude abrir la tubería {}: {e}", ruta.display());
+            }
+            eprintln!("[agente] tubería: {e}");
+            std::thread::sleep(Duration::from_secs(1));
+            continue;
+        }
+        primera = false;
+        let conectado = unsafe { ConnectNamedPipe(h, std::ptr::null_mut()) } != 0
+            || unsafe { GetLastError() } == ERROR_PIPE_CONNECTED;
+        if !conectado {
+            unsafe { CloseHandle(h) };
+            continue;
+        }
+        let con = unsafe { std::fs::File::from_raw_handle(h as _) };
+        let atender = atender.clone();
+        std::thread::spawn(move || atender(con));
+    }
+}
+
+/// Configuración por defecto: /etc/helpert/agente.toml o C:\ProgramData\Helpert\agente.toml.
+fn config_defecto() -> String {
+    #[cfg(windows)]
+    return format!(r"{}\Helpert\agente.toml", std::env::var("ProgramData").unwrap_or_else(|_| r"C:\ProgramData".into()));
+    #[cfg(unix)]
+    return "/etc/helpert/agente.toml".into();
+}
+
 fn main() {
     if std::env::args().any(|a| a == "--version") {
         println!("{}", env!("CARGO_PKG_VERSION")); // la usa la prueba de una actualización antes de instalarla
         return;
     }
-    let ruta = std::env::args().nth(1)
+    #[cfg(windows)]
+    if std::env::args().any(|a| a == "--servicio") {
+        return servicio::iniciar(); // lo arranca el administrador de servicios (sc.exe create ... --servicio)
+    }
+    arrancar();
+}
+
+fn arrancar() {
+    let ruta = std::env::args().skip(1).find(|a| !a.starts_with("--"))
         .or_else(|| std::env::var("HELPERT_AGENTE_CONFIG").ok())
-        .unwrap_or_else(|| "/etc/helpert/agente.toml".into());
+        .unwrap_or_else(config_defecto);
     let cfg: Config = std::fs::read_to_string(&ruta).map_err(|e| e.to_string())
         .and_then(|t| toml::from_str(&t).map_err(|e| e.to_string()))
         .unwrap_or_else(|e| panic!("No pude leer {ruta}: {e}"));
@@ -314,16 +484,12 @@ fn main() {
     let http = ureq::Agent::new_with_config(
         ureq::config::Config::builder().http_status_as_error(false).timeout_global(Some(Duration::from_secs(180))).build(),
     );
-    if let Some(dir) = cfg.socket.parent() {
-        std::fs::create_dir_all(dir).expect("carpeta del socket");
-    }
-    let _ = std::fs::remove_file(&cfg.socket);
-    let escucha = UnixListener::bind(&cfg.socket).expect("no pude abrir el socket");
-    // Cualquier usuario del equipo puede pedir ayuda; quién es lo dice el núcleo, y qué se ejecuta lo decide el servidor.
-    std::fs::set_permissions(&cfg.socket, std::fs::Permissions::from_mode(0o666)).expect("permisos del socket");
-    eprintln!("[agente] escuchando en {} · servidor {}", cfg.socket.display(), cfg.servidor);
     let exe = std::env::current_exe().expect("ruta del ejecutable");
+    #[cfg(windows)]
+    let _ = std::fs::remove_file(exe.with_extension("viejo.exe")); // el de antes de una actualización
     let binario = huella(&std::fs::read(&exe).expect("no pude leer mi propio ejecutable"));
+    let socket = cfg.socket.clone();
+    eprintln!("[agente] escuchando en {} · servidor {}", socket.display(), cfg.servidor);
     let agente = Arc::new(Agente { cfg, clave, http, exe, binario, avisos: Mutex::new(Vec::new()),
                                    ultimo_latido: Mutex::new(None), fallidas: Mutex::new(HashSet::new()),
                                    ocupado: AtomicUsize::new(0), remoto: Mutex::new((None, String::new())) });
@@ -335,23 +501,78 @@ fn main() {
         std::thread::sleep(Duration::from_secs(300));
     });
 
-    for con in escucha.incoming().flatten() {
-        let agente = agente.clone();
-        std::thread::spawn(move || {
-            let Some(usuario) = usuario_de(&con) else { return };
-            let mut linea = String::new();
-            if BufReader::new(&con).read_line(&mut linea).is_err() {
-                return;
+    escuchar(&socket, move |con| conversar(&agente, con));
+}
+
+/// El agente como servicio de Windows: corre como LocalSystem, con el registro en C:\ProgramData\Helpert\agente.log.
+#[cfg(windows)]
+mod servicio {
+    use std::sync::OnceLock;
+    use std::time::Duration;
+    use windows_service::service::{ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus, ServiceType};
+    use windows_service::service_control_handler::{self, ServiceControlHandlerResult, ServiceStatusHandle};
+
+    const NOMBRE: &str = "helpert-agente";
+    static ESTADO: OnceLock<ServiceStatusHandle> = OnceLock::new();
+
+    windows_service::define_windows_service!(ffi_main, principal);
+
+    pub fn iniciar() {
+        windows_service::service_dispatcher::start(NOMBRE, ffi_main).expect("no lo arrancó el administrador de servicios");
+    }
+
+    fn poner(estado: ServiceState, codigo: i32) {
+        if let Some(h) = ESTADO.get() {
+            let _ = h.set_service_status(ServiceStatus {
+                service_type: ServiceType::OWN_PROCESS,
+                current_state: estado,
+                controls_accepted: if estado == ServiceState::Running { ServiceControlAccept::STOP | ServiceControlAccept::SHUTDOWN } else { ServiceControlAccept::empty() },
+                exit_code: if codigo == 0 { ServiceExitCode::Win32(0) } else { ServiceExitCode::ServiceSpecific(codigo as u32) },
+                checkpoint: 0,
+                wait_hint: Duration::default(),
+                process_id: None,
+            });
+        }
+    }
+
+    /// Un código distinto de 0 cuenta como falla: las acciones de recuperación del servicio lo vuelven a arrancar.
+    pub fn detenido(codigo: i32) {
+        poner(ServiceState::Stopped, codigo);
+    }
+
+    fn principal(_args: Vec<std::ffi::OsString>) {
+        registro();
+        let h = service_control_handler::register(NOMBRE, |c| match c {
+            ServiceControl::Stop | ServiceControl::Shutdown => {
+                detenido(0);
+                std::process::exit(0)
             }
-            agente.ocupado.fetch_add(1, Ordering::SeqCst);
-            let resp = match serde_json::from_str::<Value>(&linea) {
-                Ok(pet) => agente.atender(&pet, &usuario, &mut || {
-                    let _ = writeln!(&con, r#"{{"progreso":"trabajando"}}"#);
-                }),
-                Err(_) => json!({"error": "JSON no válido"}),
-            };
-            agente.ocupado.fetch_sub(1, Ordering::SeqCst);
-            let _ = writeln!(&con, "{resp}");
+            ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
+            _ => ServiceControlHandlerResult::NotImplemented,
         });
+        let Ok(h) = h else { return };
+        let _ = ESTADO.set(h);
+        poner(ServiceState::Running, 0);
+        // un pánico (configuración que no se lee, tubería ocupada) queda en el registro y cuenta como falla
+        std::panic::set_hook(Box::new(|p| {
+            eprintln!("[agente] {p}");
+            super::salir(1);
+        }));
+        super::arrancar();
+    }
+
+    /// Lo que el agente escribe en stderr va a un archivo (un servicio no tiene consola). Empieza de nuevo
+    /// si pasa de 5 MB.
+    fn registro() {
+        use std::os::windows::io::IntoRawHandle;
+        use windows_sys::Win32::System::Console::{SetStdHandle, STD_ERROR_HANDLE};
+        let dir = std::path::PathBuf::from(std::env::var("ProgramData").unwrap_or_else(|_| r"C:\ProgramData".into())).join("Helpert");
+        let _ = std::fs::create_dir_all(&dir);
+        let ruta = dir.join("agente.log");
+        let grande = std::fs::metadata(&ruta).is_ok_and(|m| m.len() > 5 << 20);
+        let f = std::fs::OpenOptions::new().create(true).append(!grande).write(true).truncate(grande).open(&ruta);
+        if let Ok(f) = f {
+            unsafe { SetStdHandle(STD_ERROR_HANDLE, f.into_raw_handle() as _) };
+        }
     }
 }

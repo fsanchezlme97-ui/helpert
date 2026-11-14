@@ -1,4 +1,4 @@
-# Playbook inofensivo para las pruebas: crea y borra un archivo en /tmp.
+# Playbook inofensivo para las pruebas: crea y borra un archivo temporal.
 id = "demo.archivo"
 version = "0.1.0"
 nombre = "Archivo de prueba"
@@ -9,6 +9,7 @@ timeout = 10
 
 [sistemas]
 linux = "linux.sh"
+windows = "windows.ps1"
 
 [parametros.nombre]
 tipo = "texto"

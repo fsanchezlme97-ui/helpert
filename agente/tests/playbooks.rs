@@ -4,6 +4,19 @@ use serde_json::json;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+const SO: &str = std::env::consts::OS;
+
+fn copiar(de: &Path, a: &Path) {
+    std::fs::create_dir_all(a).unwrap();
+    for e in std::fs::read_dir(de).unwrap().flatten() {
+        if e.file_type().unwrap().is_dir() {
+            copiar(&e.path(), &a.join(e.file_name()));
+        } else {
+            std::fs::copy(e.path(), a.join(e.file_name())).unwrap();
+        }
+    }
+}
+
 fn raiz() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().to_path_buf()
 }
@@ -13,7 +26,7 @@ fn firmados(nombre: &str) -> (PathBuf, ed25519_dalek::VerifyingKey) {
     let dir = std::env::temp_dir().join(format!("helpert-test-{nombre}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
-    assert!(Command::new("cp").arg("-r").arg(raiz().join("pruebas/playbooks")).arg(dir.join("pb")).status().unwrap().success());
+    copiar(&raiz().join("pruebas/playbooks"), &dir.join("pb"));
     let srv = |args: &[&str]| {
         let ok = Command::new("uv").args(["run", "-q", "--project"]).arg(raiz().join("server"))
             .arg("helpert-server").args(args).status().unwrap().success();
@@ -32,23 +45,32 @@ fn firma_de_python_valida_y_ejecucion_completa() {
     let p = cargar(&pb, "demo.archivo", "0.1.0", &clave).expect("firma válida");
     let nombre = format!("t{}", std::process::id());
     let env = validar(&p.manifiesto, json!({"nombre": nombre}).as_object().unwrap()).unwrap();
-    let archivo = PathBuf::from(format!("/tmp/helpert-prueba-{nombre}"));
-    assert_eq!(ejecutar(&p, "linux", "diagnosticar", &env, "ana").codigo, 0);
-    let s = ejecutar(&p, "linux", "aplicar", &env, "ana");
+    #[cfg(unix)]
+    let (archivo, ruta) = (PathBuf::from(format!("/tmp/helpert-prueba-{nombre}")), "/usr/local/sbin:".to_string());
+    #[cfg(windows)]
+    let (archivo, ruta) = {
+        let raiz = std::env::var("SystemRoot").unwrap();
+        (PathBuf::from(format!(r"{raiz}\Temp\helpert-prueba-{nombre}")), format!(r"{raiz}\System32;"))
+    };
+    let d = ejecutar(&p, SO, "diagnosticar", &env, "ana");
+    assert_eq!(d.codigo, 0, "{d:?}");
+    assert!(d.salida.contains("Se creará"), "salida en UTF-8: {d:?}");
+    let s = ejecutar(&p, SO, "aplicar", &env, "ana");
     assert_eq!(s.codigo, 0, "{s:?}");
     let contenido = std::fs::read_to_string(&archivo).unwrap();
-    assert!(contenido.contains("paso=aplicar usuario=ana path=/usr/local/sbin:"), "{contenido}");
-    assert_eq!(ejecutar(&p, "linux", "verificar", &env, "ana").codigo, 0);
-    assert_eq!(ejecutar(&p, "linux", "deshacer", &env, "ana").codigo, 0);
+    assert!(contenido.contains(&format!("paso=aplicar usuario=ana path={ruta}")), "{contenido}");
+    assert_eq!(ejecutar(&p, SO, "verificar", &env, "ana").codigo, 0);
+    assert_eq!(ejecutar(&p, SO, "deshacer", &env, "ana").codigo, 0);
     assert!(!archivo.exists());
-    assert_eq!(ejecutar(&p, "linux", "rm -rf /", &env, "ana").codigo, -1);
-    assert_eq!(ejecutar(&p, "windows", "aplicar", &env, "ana").codigo, -1);
+    assert_eq!(ejecutar(&p, SO, "rm -rf /", &env, "ana").codigo, -1);
+    let otro = if SO == "linux" { "windows" } else { "linux" };
+    assert_eq!(ejecutar(&p, otro, "aplicar", &env, "ana").codigo, -1); // el script de otro sistema nunca corre aquí
 }
 
 #[test]
 fn rechaza_script_alterado() {
     let (pb, clave) = firmados("alterado");
-    let script = pb.join("demo.archivo/linux.sh");
+    let script = pb.join(if SO == "windows" { "demo.archivo/windows.ps1" } else { "demo.archivo/linux.sh" });
     let mut t = std::fs::read_to_string(&script).unwrap();
     t.push_str("\ntouch /tmp/helpert-pwned\n");
     std::fs::write(&script, t).unwrap();
@@ -80,11 +102,13 @@ fn valida_parametros_como_el_servidor() {
 
 #[test]
 fn corta_por_tiempo_y_mata_a_los_hijos() {
-    let m: Manifiesto = toml::from_str("id='x'\nversion='1'\nnombre='x'\ntimeout=1\n[sistemas]\nlinux='l.sh'").unwrap();
-    let archivos = [("l.sh".to_string(), b"sleep 30 & sleep 30".to_vec())].into_iter().collect();
+    let m: Manifiesto = toml::from_str("id='x'\nversion='1'\nnombre='x'\ntimeout=1\n[sistemas]\nlinux='l.sh'\nwindows='w.ps1'").unwrap();
+    let archivos = [("l.sh".to_string(), b"sleep 30 & sleep 30".to_vec()),
+                    ("w.ps1".to_string(), b"Start-Process -NoNewWindow ping -ArgumentList '-n','30','127.0.0.1'; Start-Sleep 30".to_vec())]
+        .into_iter().collect();
     let p = Paquete { manifiesto: m, archivos };
     let t = std::time::Instant::now();
-    assert_eq!(ejecutar(&p, "linux", "aplicar", &[], "ana").codigo, 124);
+    assert_eq!(ejecutar(&p, SO, "aplicar", &[], "ana").codigo, 124);
     assert!(t.elapsed().as_secs() < 5);
 }
 
@@ -116,21 +140,22 @@ fn actualizacion_firmada_en_python() {
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let bin = dir.join("helpert-agente");
+    let otro = if SO == "linux" { "windows" } else { "linux" };
     std::fs::write(&bin, b"binario de prueba").unwrap();
     let srv = |args: &[&str]| {
         assert!(Command::new("uv").args(["run", "-q", "--project"]).arg(raiz().join("server"))
             .arg("helpert-server").args(args).status().unwrap().success());
     };
     srv(&["claves", dir.join("claves").to_str().unwrap()]);
-    srv(&["firmar-agente", bin.to_str().unwrap(), "--version", "0.2.0", "--so", "linux",
+    srv(&["firmar-agente", bin.to_str().unwrap(), "--version", "0.2.0", "--so", SO,
           "--clave", dir.join("claves/playbooks.key").to_str().unwrap()]);
     let clave = leer_clave(&dir.join("claves/playbooks.pub")).unwrap();
     let firma = std::fs::read_to_string(dir.join("helpert-agente.firma")).unwrap();
     let datos = std::fs::read(&bin).unwrap();
     let sha = huella(&datos);
-    assert!(verificar_actualizacion(&datos, "0.2.0", "linux", &sha, &firma, &clave).is_ok());
-    assert!(verificar_actualizacion(&datos, "0.2.1", "linux", &sha, &firma, &clave).is_err());
-    assert!(verificar_actualizacion(b"otro binario", "0.2.0", "linux", &sha, &firma, &clave).is_err());
-    assert!(verificar_actualizacion(&datos, "0.2.0", "windows", &sha, &firma, &clave).is_err());
+    assert!(verificar_actualizacion(&datos, "0.2.0", SO, &sha, &firma, &clave).is_ok());
+    assert!(verificar_actualizacion(&datos, "0.2.1", SO, &sha, &firma, &clave).is_err());
+    assert!(verificar_actualizacion(b"otro binario", "0.2.0", SO, &sha, &firma, &clave).is_err());
+    assert!(verificar_actualizacion(&datos, "0.2.0", otro, &sha, &firma, &clave).is_err());
     let _ = std::fs::remove_dir_all(&dir);
 }

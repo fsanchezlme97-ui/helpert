@@ -1,0 +1,41 @@
+# Pruebas en Linux y Windows, y los binarios de Windows listos para empaquetar (despliegue/empaquetar-windows.sh).
+# Aquí nunca hay claves: los playbooks y las versiones del agente se firman fuera, donde está la clave privada.
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 10
+    env:
+      HELPERT_TEST_DSN: postgresql://postgres:postgres@localhost:5432/helpert_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: cd server && uv run pytest -q
+      - run: cd agente && cargo test -q
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Agente
+        run: cd agente; cargo test -q; cargo build --release -q
+      - name: Bandeja
+        run: cd bandeja; cargo build --release -q
+      - uses: actions/upload-artifact@v4
+        with:
+          name: helpert-windows
+          path: |
+            agente/target/release/helpert-agente.exe
+            agente/target/release/helpert.exe
+            bandeja/target/release/helpert-bandeja.exe
